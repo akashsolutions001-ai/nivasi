@@ -2,5 +2,11 @@
   "buildCommand": "chmod +x build.sh && ./build.sh",
   "outputDirectory": "dist",
   "framework": "vite",
-  "installCommand": "npm install"
-} 
+  "installCommand": "npm install",
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
