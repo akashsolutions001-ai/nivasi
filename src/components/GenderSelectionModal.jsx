@@ -32,7 +32,7 @@ const GenderSelectionModal = ({ onGenderSelect, isUpdateMode = false, onClose })
                 {isUpdateMode ? (t('selectNewGender') || 'Select your new preference') : t('selectGenderToSeeRooms')}
               </p>
             </div>
-            {isUpdateMode && onClose && (
+            {onClose && (
               <button
                 onClick={onClose}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"

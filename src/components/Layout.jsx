@@ -178,13 +178,19 @@ const Layout = () => {
             {/* Modals */}
             {(showLocationSelection && hasAcceptedTerms) && (
                 <Suspense fallback={<ModalLoadingSpinner />}>
-                    <LocationSelectionModal onLocationSelect={handleLocationSelect} />
+                    <LocationSelectionModal
+                        onLocationSelect={handleLocationSelect}
+                        onClose={() => setShowLocationSelection(false)}
+                    />
                 </Suspense>
             )}
 
             {(showGenderSelection && hasAcceptedTerms) && (
                 <Suspense fallback={<ModalLoadingSpinner />}>
-                    <GenderSelectionModal onGenderSelect={handleGenderSelect} />
+                    <GenderSelectionModal
+                        onGenderSelect={handleGenderSelect}
+                        onClose={() => setShowGenderSelection(false)}
+                    />
                 </Suspense>
             )}
 
