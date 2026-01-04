@@ -124,7 +124,7 @@ const RoomDetailModal = ({ room, onClose }) => {
           <div className="flex flex-col lg:flex-row">
 
             {/* LEFT SIDE - Image Gallery */}
-            <div className="lg:w-[45%] xl:w-[40%] lg:sticky lg:top-0 lg:h-[calc(95vh-60px)] bg-gray-50 p-4 lg:p-5 flex items-center">
+            <div className="lg:w-[45%] xl:w-[40%] lg:sticky lg:top-0 lg:h-[calc(95vh-60px)] bg-gray-50 p-3 sm:p-4 lg:p-5 flex items-center">
               <div className="flex flex-col lg:flex-row gap-3 w-full">
 
                 {/* Vertical Thumbnails - Desktop Only */}
@@ -156,7 +156,7 @@ const RoomDetailModal = ({ room, onClose }) => {
                         <img
                           src={room.images[currentImageIndex]}
                           alt={`${room.title} - Image ${currentImageIndex + 1}`}
-                          className="w-full h-auto max-h-[50vh] lg:max-h-[60vh] object-contain cursor-zoom-in mx-auto block"
+                          className="w-full h-auto max-h-[35vh] sm:max-h-[45vh] lg:max-h-[60vh] object-contain cursor-zoom-in mx-auto block"
                           onClick={() => setIsFullscreen(true)}
                         />
 
@@ -165,13 +165,13 @@ const RoomDetailModal = ({ room, onClose }) => {
                           <>
                             <button
                               onClick={handlePrevImage}
-                              className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full shadow-md flex items-center justify-center transition-all"
+                              className="absolute left-1 sm:left-2 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 bg-white/90 hover:bg-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95"
                             >
-                              <ChevronLeft className="w-5 h-5 text-gray-700" />
+                              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
                             </button>
                             <button
                               onClick={handleNextImage}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full shadow-md flex items-center justify-center transition-all"
+                              className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 bg-white/90 hover:bg-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95"
                             >
                               <ChevronRight className="w-5 h-5 text-gray-700" />
                             </button>
@@ -412,14 +412,14 @@ const RoomDetailModal = ({ room, onClose }) => {
           {/* Close Button */}
           <button
             onClick={() => setIsFullscreen(false)}
-            className="absolute top-4 right-4 z-50 bg-white/20 hover:bg-white/40 rounded-full p-3 transition-colors"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 z-50 bg-white/20 hover:bg-white/40 rounded-full p-2 sm:p-3 transition-colors active:scale-95"
           >
-            <X className="w-6 h-6 text-white" />
+            <X className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </button>
 
           {/* Image Counter */}
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-4 py-2 rounded-full">
-            {room.title} • {currentImageIndex + 1} / {room.images?.length || 0}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 rounded-full max-w-[70vw] truncate">
+            <span className="hidden sm:inline">{room.title} • </span>{currentImageIndex + 1} / {room.images?.length || 0}
           </div>
 
           {/* Navigation */}
@@ -427,15 +427,15 @@ const RoomDetailModal = ({ room, onClose }) => {
             <>
               <button
                 onClick={handlePrevImage}
-                className="absolute left-4 top-1/2 -translate-y-1/2 z-50 bg-white/20 hover:bg-white/40 rounded-full p-3 transition-colors"
+                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-50 bg-white/20 hover:bg-white/40 rounded-full p-2 sm:p-3 transition-colors active:scale-95"
               >
-                <ChevronLeft className="w-8 h-8 text-white" />
+                <ChevronLeft className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </button>
               <button
                 onClick={handleNextImage}
-                className="absolute right-4 top-1/2 -translate-y-1/2 z-50 bg-white/20 hover:bg-white/40 rounded-full p-3 transition-colors"
+                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-50 bg-white/20 hover:bg-white/40 rounded-full p-2 sm:p-3 transition-colors active:scale-95"
               >
-                <ChevronRight className="w-8 h-8 text-white" />
+                <ChevronRight className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </button>
             </>
           )}
@@ -444,17 +444,17 @@ const RoomDetailModal = ({ room, onClose }) => {
           <img
             src={room.images?.[currentImageIndex]}
             alt={`${room.title} - Full Size`}
-            className="max-w-[90vw] max-h-[85vh] object-contain"
+            className="max-w-[95vw] sm:max-w-[90vw] max-h-[75vh] sm:max-h-[85vh] object-contain"
           />
 
           {/* Thumbnails */}
           {room.images && room.images.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-black/60 p-2 rounded-lg max-w-[90vw] overflow-x-auto">
+            <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 sm:gap-2 bg-black/60 p-1.5 sm:p-2 rounded-lg max-w-[95vw] overflow-x-auto scrollbar-hide">
               {room.images.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => setCurrentImageIndex(idx)}
-                  className={`w-16 h-12 rounded overflow-hidden border-2 flex-shrink-0 transition-all ${idx === currentImageIndex ? 'border-orange-500' : 'border-transparent opacity-60 hover:opacity-100'
+                  className={`w-12 h-9 sm:w-16 sm:h-12 rounded overflow-hidden border-2 flex-shrink-0 transition-all active:scale-95 ${idx === currentImageIndex ? 'border-orange-500' : 'border-transparent opacity-60 hover:opacity-100'
                     }`}
                 >
                   <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />

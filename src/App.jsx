@@ -451,17 +451,18 @@ function App() {
                   size="sm"
                   variant="outline"
                   disabled={isSyncing}
-                  className="bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap"
+                  className="bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap text-xs sm:text-sm"
                 >
-                  {isSyncing ? 'Syncing...' : '⬆ Sync to Firebase'}
+                  {isSyncing ? 'Syncing...' : <><span className="hidden sm:inline">⬆ Sync to Firebase</span><span className="sm:hidden">⬆ Sync</span></>}
                 </Button>
               )}
               <Button
                 onClick={handleShowAddForm}
                 size="sm"
-                className="bg-orange-600 hover:bg-orange-700 text-white whitespace-nowrap"
+                className="bg-orange-600 hover:bg-orange-700 text-white whitespace-nowrap text-xs sm:text-sm"
               >
-                + {t('addRoom')}
+                <span className="hidden sm:inline">+ {t('addRoom')}</span>
+                <span className="sm:hidden">+ Add</span>
               </Button>
             </div>
           </div>
@@ -633,73 +634,85 @@ function App() {
       </div>
 
       {/* Local Modals */}
-      {selectedRoom && (
-        <Suspense fallback={<ModalLoadingSpinner />}>
-          <RoomDetailModal
-            room={selectedRoom}
-            onClose={() => setSelectedRoom(null)}
-          />
-        </Suspense>
-      )}
+      {
+        selectedRoom && (
+          <Suspense fallback={<ModalLoadingSpinner />}>
+            <RoomDetailModal
+              room={selectedRoom}
+              onClose={() => setSelectedRoom(null)}
+            />
+          </Suspense>
+        )
+      }
 
-      {showAddForm && (
-        <Suspense fallback={<ModalLoadingSpinner />}>
-          <AddRoomModal
-            onClose={() => setShowAddForm(false)}
-            onAddRoom={handleAddRoom}
-          />
-        </Suspense>
-      )}
+      {
+        showAddForm && (
+          <Suspense fallback={<ModalLoadingSpinner />}>
+            <AddRoomModal
+              onClose={() => setShowAddForm(false)}
+              onAddRoom={handleAddRoom}
+            />
+          </Suspense>
+        )
+      }
 
-      {editRoom && (
-        <Suspense fallback={<ModalLoadingSpinner />}>
-          <AddRoomModal
-            onClose={() => setEditRoom(null)}
-            onAddRoom={handleUpdateRoom}
-            initialRoom={editRoom}
-            isEdit
-          />
-        </Suspense>
-      )}
+      {
+        editRoom && (
+          <Suspense fallback={<ModalLoadingSpinner />}>
+            <AddRoomModal
+              onClose={() => setEditRoom(null)}
+              onAddRoom={handleUpdateRoom}
+              initialRoom={editRoom}
+              isEdit
+            />
+          </Suspense>
+        )
+      }
 
-      {showAdminLogin && (
-        <Suspense fallback={<ModalLoadingSpinner />}>
-          <AdminLoginModal
-            onClose={() => setShowAdminLogin(false)}
-            onAdminLogin={handleAdminLogin}
-          />
-        </Suspense>
-      )}
+      {
+        showAdminLogin && (
+          <Suspense fallback={<ModalLoadingSpinner />}>
+            <AdminLoginModal
+              onClose={() => setShowAdminLogin(false)}
+              onAdminLogin={handleAdminLogin}
+            />
+          </Suspense>
+        )
+      }
 
-      {showBookingModal && selectedRoomForBooking && (
-        <Suspense fallback={<ModalLoadingSpinner />}>
-          <BookingModal
-            isOpen={showBookingModal}
-            onClose={() => {
-              setShowBookingModal(false);
-              setSelectedRoomForBooking(null);
-            }}
-            room={selectedRoomForBooking}
-            onBookingSuccess={handleBookingSuccess}
-          />
-        </Suspense>
-      )}
+      {
+        showBookingModal && selectedRoomForBooking && (
+          <Suspense fallback={<ModalLoadingSpinner />}>
+            <BookingModal
+              isOpen={showBookingModal}
+              onClose={() => {
+                setShowBookingModal(false);
+                setSelectedRoomForBooking(null);
+              }}
+              room={selectedRoomForBooking}
+              onBookingSuccess={handleBookingSuccess}
+            />
+          </Suspense>
+        )
+      }
 
-      {showFeatureFilter && (
-        <Suspense fallback={<ModalLoadingSpinner />}>
-          <FeatureFilterModal
-            isOpen={showFeatureFilter}
-            onClose={() => setShowFeatureFilter(false)}
-            onApplyFilters={(features, price) => {
-              setFeatureFilters(features);
-              if (price) setMaxPrice(price);
-            }}
-            currentFilters={featureFilters}
-            currentMaxPrice={maxPrice}
-          />
-        </Suspense>
-      )}
-    </div>
+      {
+        showFeatureFilter && (
+          <Suspense fallback={<ModalLoadingSpinner />}>
+            <FeatureFilterModal
+              isOpen={showFeatureFilter}
+              onClose={() => setShowFeatureFilter(false)}
+              onApplyFilters={(features, price) => {
+                setFeatureFilters(features);
+                if (price) setMaxPrice(price);
+              }}
+              currentFilters={featureFilters}
+              currentMaxPrice={maxPrice}
+            />
+          </Suspense>
+        )
+      }
+    </div >
   );
 }
 

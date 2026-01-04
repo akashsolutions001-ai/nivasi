@@ -222,8 +222,8 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
         {/* Submit Message */}
         {submitMessage && (
           <div className={`mx-6 mt-4 px-4 py-2 rounded-md flex items-center gap-2 ${submitMessage.includes('Error')
-              ? 'bg-red-50 border border-red-200 text-red-800'
-              : 'bg-green-50 border border-green-200 text-green-800'
+            ? 'bg-red-50 border border-red-200 text-red-800'
+            : 'bg-green-50 border border-green-200 text-green-800'
             }`}>
             {submitMessage.includes('Error') ? (
               <AlertCircle className="w-4 h-4" />
@@ -382,19 +382,19 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 {t('features')} / Amenities
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 max-h-[40vh] overflow-y-auto p-1">
                 {AVAILABLE_FEATURES.map((feature) => (
                   <label
                     key={feature}
-                    className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all hover:bg-orange-50 ${formData.selectedFeatures.includes(feature)
-                        ? 'border-orange-500 bg-orange-50'
-                        : 'border-gray-200'
+                    className={`flex items-center gap-3 p-3 sm:p-3 border rounded-lg cursor-pointer transition-all active:scale-[0.98] ${formData.selectedFeatures.includes(feature)
+                      ? 'border-orange-500 bg-orange-50'
+                      : 'border-gray-200 hover:bg-orange-50'
                       }`}
                   >
                     <Checkbox
                       checked={formData.selectedFeatures.includes(feature)}
                       onCheckedChange={() => handleFeatureToggle(feature)}
-                      className="data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                      className="data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500 w-5 h-5"
                     />
                     <span className="text-sm text-gray-700">{feature}</span>
                   </label>
@@ -412,8 +412,8 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
               </label>
               <div className="grid grid-cols-2 gap-4">
                 <label className={`flex items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all ${formData.gender === 'boy'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 hover:border-gray-400'
                   }`}>
                   <input
                     type="radio"
@@ -430,8 +430,8 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
                 </label>
 
                 <label className={`flex items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all ${formData.gender === 'girl'
-                    ? 'border-pink-500 bg-pink-50 text-pink-700'
-                    : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-pink-500 bg-pink-50 text-pink-700'
+                  : 'border-gray-300 hover:border-gray-400'
                   }`}>
                   <input
                     type="radio"
