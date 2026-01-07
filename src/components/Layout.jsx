@@ -47,7 +47,7 @@ const Layout = () => {
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showBookingManagement, setShowBookingManagement] = useState(false);
     const [showUserStatistics, setShowUserStatistics] = useState(false);
-    const [showTermsModal, setShowTermsModal] = useState(() => !hasAcceptedTerms);
+    const [showTermsModal, setShowTermsModal] = useState(false);
     const [notification, setNotification] = useState({ message: '', type: 'success', isVisible: false });
 
     // Update Modes
@@ -107,6 +107,13 @@ const Layout = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
+    // Show terms modal only after authentication
+    useEffect(() => {
+        if (isAuthenticated && !hasAcceptedTerms) {
+            setShowTermsModal(true);
+        }
+    }, [isAuthenticated, hasAcceptedTerms]);
+
     useEffect(() => {
         const checkProfile = async () => {
             if (isAuthenticated && user?.uid && location.pathname !== '/profile') {
@@ -147,12 +154,14 @@ const Layout = () => {
                 onClose={() => setNotification(prev => ({ ...prev, isVisible: false }))}
             />
 
-            <TermsAndConditionsModal
-                isOpen={showTermsModal}
-                onAccept={handleTermsAccept}
-                onDecline={handleTermsDecline}
-                t={t}
-            />
+            {isAuthenticated && (
+                <TermsAndConditionsModal
+                    isOpen={showTermsModal}
+                    onAccept={handleTermsAccept}
+                    onDecline={handleTermsDecline}
+                    t={t}
+                />
+            )}
 
             {/* Global Header */}
             {isAuthenticated && (
@@ -176,7 +185,7 @@ const Layout = () => {
 
 
             {/* Modals */}
-            {(showLocationSelection && hasAcceptedTerms) && (
+            {(isAuthenticated && showLocationSelection && hasAcceptedTerms) && (
                 <Suspense fallback={<ModalLoadingSpinner />}>
                     <LocationSelectionModal
                         onLocationSelect={handleLocationSelect}
@@ -185,7 +194,7 @@ const Layout = () => {
                 </Suspense>
             )}
 
-            {(showGenderSelection && hasAcceptedTerms) && (
+            {(isAuthenticated && showGenderSelection && hasAcceptedTerms) && (
                 <Suspense fallback={<ModalLoadingSpinner />}>
                     <GenderSelectionModal
                         onGenderSelect={handleGenderSelect}

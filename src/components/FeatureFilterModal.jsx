@@ -75,8 +75,8 @@ const FeatureFilterModal = ({ isOpen, onClose, onApplyFilters, currentFilters = 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4">
+      <div className="bg-white rounded-t-xl sm:rounded-lg shadow-xl w-full sm:max-w-md max-h-[85vh] sm:max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
@@ -101,8 +101,8 @@ const FeatureFilterModal = ({ isOpen, onClose, onApplyFilters, currentFilters = 
         </div>
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto max-h-[60vh]">
-          <div className="space-y-6">
+        <div className="p-3 sm:p-4 overflow-y-auto overscroll-contain max-h-[55vh] sm:max-h-[60vh]">
+          <div className="space-y-4 sm:space-y-6">
             {/* Price Filter */}
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-3">
@@ -151,13 +151,14 @@ const FeatureFilterModal = ({ isOpen, onClose, onApplyFilters, currentFilters = 
               </div>
 
               {/* Features list */}
-              <div className="space-y-2">
+              <div className="space-y-3 pb-2">
                 {availableFeatures.map((feature) => (
-                  <div key={feature.key} className="flex items-center space-x-3">
+                  <div key={feature.key} className="flex items-center space-x-3 min-h-[36px]">
                     <Checkbox
                       id={feature.key}
                       checked={selectedFeatures[feature.key] || false}
                       onCheckedChange={() => handleFeatureToggle(feature.key)}
+                      className="w-5 h-5"
                     />
                     <label
                       htmlFor={feature.key}

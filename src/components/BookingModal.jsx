@@ -34,53 +34,44 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
   // Reset form and fetch profile when modal opens
   useEffect(() => {
     if (isOpen) {
-      // Default reset
-      const initialData = {
-        type: bookingTypes.INQUIRY,
-        message: '',
-        requestedDate: '',
-        requestedTime: '',
-        userName: '',
-        userEmail: '',
-        userPhone: '',
-        userCollege: ''
-      };
+      const initializeForm = async () => {
+        // Default reset
+        let initialData = {
+          type: bookingTypes.INQUIRY,
+          message: '',
+          requestedDate: '',
+          requestedTime: '',
+          userName: '',
+          userEmail: '',
+          userPhone: '',
+          userCollege: ''
+        };
 
-      // If authenticated, try to fetch profile data
-      if (isAuthenticated && user?.uid) {
-        // Set basic auth data first
-        initialData.userName = user.displayName || '';
-        initialData.userEmail = user.email || '';
+        // If authenticated, try to fetch profile data
+        if (isAuthenticated && user?.uid) {
+          // Set basic auth data first
+          initialData.userName = user.displayName || '';
+          initialData.userEmail = user.email || '';
 
-        const fetchProfile = async () => {
           try {
             const userDoc = await getDoc(doc(db, 'users', user.uid));
             if (userDoc.exists()) {
               const data = userDoc.data();
-              setFormData(prev => ({
-                ...prev,
-                userName: data.displayName || prev.userName,
-                userPhone: data.phone || '',
-                userCollege: data.college || '',
-                // Email usually doesn't change but we can sync it
-                userEmail: user.email || prev.userEmail
-              }));
-            } else {
-              setFormData(prev => ({
-                ...prev,
-                userName: user.displayName || '',
-                userEmail: user.email || ''
-              }));
+              initialData.userName = data.displayName || data.name || user.displayName || '';
+              initialData.userPhone = data.phone || '';
+              initialData.userCollege = data.college || '';
+              initialData.userEmail = user.email || data.email || '';
             }
           } catch (error) {
             console.error("Error fetching profile for booking:", error);
           }
-        };
-        fetchProfile();
-      }
+        }
 
-      setFormData(initialData);
-      setSubmitStatus(null);
+        setFormData(initialData);
+        setSubmitStatus(null);
+      };
+
+      initializeForm();
     }
   }, [isOpen, isAuthenticated, user]);
 
@@ -129,9 +120,12 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
     }
 
     if (!formData.userCollege.trim()) {
-      // Optional validation for college? User asked for it, assume required or strongly encouraged.
-      // Let's make it required as it seems important to the user.
       alert('Please enter your college name');
+      return;
+    }
+
+    if (!formData.requestedDate) {
+      alert(t('pleaseSelectPreferredDate') || 'Please select your preferred date for visiting');
       return;
     }
 
@@ -154,19 +148,27 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
         requestedTime: formData.requestedTime
       };
 
-      const newBooking = addBooking(bookingData);
+      // Await the async addBooking function
+      const newBooking = await addBooking(bookingData);
 
-      setSubmittedBooking(newBooking);
+      // Create a complete booking object with all data for WhatsApp
+      const completeBooking = {
+        ...bookingData,
+        id: newBooking.id,
+        createdAt: new Date().toISOString()
+      };
+
+      setSubmittedBooking(completeBooking);
       setSubmitStatus('success');
 
       // Call success callback if provided
       if (onBookingSuccess) {
-        onBookingSuccess(newBooking);
+        onBookingSuccess(completeBooking);
       }
 
       // Auto redirect to WhatsApp after 1 second
       setTimeout(() => {
-        openWhatsAppWithBooking(newBooking, room);
+        openWhatsAppWithBooking(completeBooking, room);
       }, 1000);
 
     } catch (error) {
@@ -206,16 +208,16 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
               <Calendar className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-lg sm:text-2xl font-bold text-gray-900">
                 {t('bookRoom') || 'Book Room'}
               </h2>
               <p className="text-sm text-gray-600">
@@ -232,7 +234,7 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
           {submitStatus === 'success' ? (
             <div className="text-center py-8">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -338,8 +340,8 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
                       type="button"
                       onClick={() => handleInputChange('type', type)}
                       className={`p-4 rounded-lg border-2 transition-all text-left ${formData.type === type
-                          ? 'border-orange-500 bg-orange-50 text-orange-700'
-                          : 'border-gray-200 hover:border-orange-300 hover:bg-orange-25'
+                        ? 'border-orange-500 bg-orange-50 text-orange-700'
+                        : 'border-gray-200 hover:border-orange-300 hover:bg-orange-25'
                         }`}
                     >
                       <div className="font-semibold mb-1">
@@ -428,7 +430,7 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
 
                 <div className="space-y-2">
                   <Label htmlFor="requestedDate">
-                    {t('preferredDate') || 'Preferred Date'}
+                    {t('preferredDate') || 'Preferred Date'} *
                   </Label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -437,7 +439,9 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
                       type="date"
                       value={formData.requestedDate}
                       onChange={(e) => handleInputChange('requestedDate', e.target.value)}
-                      className="pl-10"
+                      className={`pl-10 ${!formData.requestedDate ? 'border-red-300 focus:border-red-500' : ''}`}
+                      required
+                      min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
                 </div>
@@ -515,7 +519,7 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
                 <Button
                   type="submit"
                   onClick={handleSubmit}
-                  disabled={isSubmitting || !formData.userName.trim() || !formData.userPhone.trim() || !formData.userEmail.trim() || !formData.userCollege.trim()}
+                  disabled={isSubmitting || !formData.userName.trim() || !formData.userPhone.trim() || !formData.userEmail.trim() || !formData.userCollege.trim() || !formData.requestedDate}
                   className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (

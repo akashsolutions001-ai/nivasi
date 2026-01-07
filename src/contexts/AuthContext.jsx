@@ -25,7 +25,6 @@ export const AuthProvider = ({ children }) => {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   useEffect(() => {
-    console.log('AuthContext: Initializing auth...');
     isMountedRef.current = true;
     redirectResultHandledRef.current = false;
 
@@ -37,33 +36,27 @@ export const AuthProvider = ({ children }) => {
       try {
         const storedUser = localStorage.getItem('nivasi_auth_user');
         if (storedUser && isIOS) {
-          console.log('AuthContext: iOS - Found stored auth user');
-          const parsedUser = JSON.parse(storedUser);
-          console.log('AuthContext: iOS - Stored user email:', parsedUser.email);
+          // iOS - Found stored auth user
         }
       } catch (error) {
-        console.error('AuthContext: Error checking stored auth state:', error);
+        // Silent fail for stored auth check
       }
     };
 
     // Handle redirect result when user returns from Google auth
     const handleRedirectResult = async () => {
       try {
-        console.log('AuthContext: Checking for redirect result...');
         setRedirectLoading(true);
         setAuthError(null);
 
         // For iOS, add a small delay to ensure redirect is complete
         if (isIOS) {
-          console.log('AuthContext: iOS - Adding delay before checking redirect result...');
           await new Promise(resolve => setTimeout(resolve, 1500));
         }
 
         const result = await getRedirectResult(auth);
 
         if (result && result.user && isMountedRef.current) {
-          console.log('AuthContext: Redirect result received:', result.user?.email);
-
           // Mark redirect result as handled
           redirectResultHandledRef.current = true;
 
@@ -71,7 +64,7 @@ export const AuthProvider = ({ children }) => {
           try {
             sessionStorage.removeItem('nivasi_pending_redirect');
           } catch (e) {
-            console.error('AuthContext: Failed to clear redirect flag:', e);
+            // Silent fail
           }
 
           // Store user in localStorage for iOS persistence
@@ -83,9 +76,8 @@ export const AuthProvider = ({ children }) => {
                 displayName: result.user.displayName,
                 photoURL: result.user.photoURL
               }));
-              console.log('AuthContext: iOS - Stored user in localStorage');
             } catch (e) {
-              console.error('AuthContext: iOS - Failed to store user:', e);
+              // Silent fail for iOS storage
             }
           }
 
@@ -96,12 +88,9 @@ export const AuthProvider = ({ children }) => {
 
           return true; // Redirect result found
         } else if (isMountedRef.current) {
-          console.log('AuthContext: No redirect result found');
           return false;
         }
       } catch (error) {
-        console.error('AuthContext: Redirect result error:', error);
-
         if (isMountedRef.current) {
           // Only set error if it's not a "no redirect result" type error
           if (error.code !== 'auth/credential-already-in-use') {
@@ -119,17 +108,13 @@ export const AuthProvider = ({ children }) => {
 
     // Set up auth state listener - this is the MAIN way we detect auth changes
     const setupAuthStateListener = () => {
-      console.log('AuthContext: Setting up auth state listener...');
-
       authStateUnsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-        console.log('AuthContext: Auth state changed:', firebaseUser ? `User logged in (${firebaseUser.email})` : 'User logged out');
-
         if (firebaseUser) {
           // Clear pending redirect flag on successful auth
           try {
             sessionStorage.removeItem('nivasi_pending_redirect');
           } catch (e) {
-            console.error('AuthContext: Failed to clear redirect flag:', e);
+            // Silent fail
           }
 
           // Store user in localStorage for iOS persistence
@@ -142,7 +127,7 @@ export const AuthProvider = ({ children }) => {
                 photoURL: firebaseUser.photoURL
               }));
             } catch (e) {
-              console.error('AuthContext: iOS - Failed to store user:', e);
+              // Silent fail for iOS storage
             }
           }
         } else if (isIOS) {
@@ -151,7 +136,7 @@ export const AuthProvider = ({ children }) => {
             localStorage.removeItem('nivasi_auth_user');
             sessionStorage.removeItem('nivasi_pending_redirect');
           } catch (e) {
-            console.error('AuthContext: iOS - Failed to clear stored user:', e);
+            // Silent fail
           }
         }
 
@@ -162,16 +147,12 @@ export const AuthProvider = ({ children }) => {
           setAuthError(null);
         }
       }, (error) => {
-        console.error('AuthContext: Auth state change error:', error);
-
         if (isMountedRef.current) {
           setAuthError(error);
           setLoading(false);
           setRedirectLoading(false);
         }
       });
-
-      console.log('AuthContext: Auth state listener setup complete');
     };
 
     // Initialize authentication
@@ -181,7 +162,6 @@ export const AuthProvider = ({ children }) => {
         checkStoredAuthState();
 
         // Set up auth state listener FIRST - this is critical
-        // This ensures we catch any existing auth state immediately
         setupAuthStateListener();
 
         // Small delay to let auth state listener initialize
@@ -193,7 +173,6 @@ export const AuthProvider = ({ children }) => {
         // Add a timeout to prevent infinite loading
         const loadingTimeoutId = setTimeout(() => {
           if (isMountedRef.current && loading) {
-            console.warn('AuthContext: Loading timeout reached, forcing loading to false');
             setLoading(false);
             setRedirectLoading(false);
           }
@@ -201,8 +180,6 @@ export const AuthProvider = ({ children }) => {
         timeoutIds.push(loadingTimeoutId);
 
       } catch (error) {
-        console.error('AuthContext: Initialization error:', error);
-
         if (isMountedRef.current) {
           setAuthError(error);
           setLoading(false);
@@ -215,10 +192,8 @@ export const AuthProvider = ({ children }) => {
 
     // Cleanup function
     return () => {
-      console.log('AuthContext: Cleaning up...');
       isMountedRef.current = false;
       if (authStateUnsubscribe) {
-        console.log('AuthContext: Unsubscribing auth state listener');
         authStateUnsubscribe();
       }
       timeoutIds.forEach(id => clearTimeout(id));
@@ -227,14 +202,12 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      console.log('AuthContext: Logging out user...');
-
       // Clear localStorage for iOS
       if (isIOS) {
         try {
           localStorage.removeItem('nivasi_auth_user');
         } catch (e) {
-          console.error('AuthContext: iOS - Failed to clear stored user:', e);
+          // Silent fail
         }
       }
 
@@ -242,17 +215,15 @@ export const AuthProvider = ({ children }) => {
       try {
         sessionStorage.removeItem('nivasi_pending_redirect');
       } catch (e) {
-        console.error('AuthContext: Failed to clear redirect flag:', e);
+        // Silent fail
       }
 
       await signOut(auth);
-      console.log('AuthContext: User logged out successfully');
 
       // Clear any stored auth data
       setUser(null);
       setAuthError(null);
     } catch (error) {
-      console.error('AuthContext: Logout error:', error);
       setAuthError(error);
     }
   };

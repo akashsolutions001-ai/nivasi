@@ -16,7 +16,6 @@ export const fetchRooms = async () => {
             ...doc.data()
         }));
 
-        console.log(`Fetched ${rooms.length} rooms from Firestore`);
         return rooms;
     } catch (error) {
         console.error('Error fetching rooms from Firestore:', error);
@@ -42,7 +41,6 @@ export const addRoom = async (roomData) => {
 
         const docRef = await addDoc(roomsRef, roomToAdd);
 
-        console.log('Room added with ID:', docRef.id);
         return {
             id: docRef.id,
             ...roomData
@@ -70,7 +68,6 @@ export const updateRoom = async (roomId, roomData) => {
 
         await updateDoc(roomRef, roomToUpdate);
 
-        console.log('Room updated:', roomId);
         return {
             id: roomId,
             ...roomData
@@ -89,7 +86,6 @@ export const deleteRoom = async (roomId) => {
         const roomRef = doc(db, ROOMS_COLLECTION, roomId);
         await deleteDoc(roomRef);
 
-        console.log('Room deleted:', roomId);
         return true;
     } catch (error) {
         console.error('Error deleting room from Firestore:', error);
@@ -106,11 +102,8 @@ export const migrateRoomsToFirestore = async (staticRooms) => {
         const existingRooms = await fetchRooms();
 
         if (existingRooms.length > 0) {
-            console.log('Rooms already exist in Firestore, skipping migration');
             return existingRooms;
         }
-
-        console.log('Migrating rooms to Firestore...');
 
         const migratedRooms = [];
         for (const room of staticRooms) {
@@ -118,7 +111,6 @@ export const migrateRoomsToFirestore = async (staticRooms) => {
             migratedRooms.push(addedRoom);
         }
 
-        console.log(`Migrated ${migratedRooms.length} rooms to Firestore`);
         return migratedRooms;
     } catch (error) {
         console.error('Error migrating rooms to Firestore:', error);

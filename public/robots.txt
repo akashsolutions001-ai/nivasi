@@ -50,7 +50,7 @@ Allow: /favicon.ico
 Crawl-delay: 1
 
 # Sitemap location
-Sitemap: https://nivasi.space/sitemap.xml
+Sitemap: https://nivasispace.com/sitemap.xml
 
 # Host directive
-Host: https://nivasi.space 
+Host: https://nivasispace.com 

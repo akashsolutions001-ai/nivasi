@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useUserPreferences } from '../contexts/UserPreferencesContext.jsx';
 import { db } from '../firebase.js';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -37,6 +38,7 @@ const CITIES = [
 
 const ProfilePage = () => {
     const { user, isAuthenticated } = useAuth();
+    const { setSelectedGender } = useUserPreferences();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const isOnboarding = searchParams.get('onboarding') === 'true';
@@ -76,6 +78,10 @@ const ProfilePage = () => {
                             city: data.city || '',
                             gender: data.gender || ''
                         });
+                        // Sync gender with UserPreferences for room filtering
+                        if (data.gender) {
+                            setSelectedGender(data.gender);
+                        }
                     } else {
                         // Initialize with auth data
                         setFormData({
@@ -155,6 +161,9 @@ const ProfilePage = () => {
                 gender: formData.gender,
                 updatedAt: new Date().toISOString()
             }, { merge: true });
+
+            // Sync gender with UserPreferences context for room filtering
+            setSelectedGender(formData.gender);
 
             setSaveSuccess(true);
 
@@ -285,8 +294,8 @@ const ProfilePage = () => {
                                             required
                                         >
                                             <option value="">Select Gender</option>
-                                            <option value="male">Male</option>
-                                            <option value="female">Female</option>
+                                            <option value="boy">Boy</option>
+                                            <option value="girl">Girl</option>
                                         </select>
                                         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                                             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -50,24 +50,19 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     // For iOS devices, always use local persistence to maintain auth state after redirect
     if (isIOS) {
       await setPersistence(auth, browserLocalPersistence);
-      console.log('Firebase: Using local persistence for iOS device');
     } else if (detection.shouldUseRedirect) {
-      // For other WebView environments, use local persistence (changed from session for better persistence)
+      // For other WebView environments, use local persistence
       await setPersistence(auth, browserLocalPersistence);
-      console.log('Firebase: Using local persistence for WebView/in-app browser');
     } else {
       // For regular browsers, use local persistence
       await setPersistence(auth, browserLocalPersistence);
-      console.log('Firebase: Using local persistence for regular browser');
     }
   } catch (error) {
-    console.error('Firebase: Error setting persistence:', error);
     // Fallback - try local persistence
     try {
       await setPersistence(auth, browserLocalPersistence);
-      console.log('Firebase: Fallback to local persistence');
     } catch (fallbackError) {
-      console.error('Firebase: Fallback persistence also failed:', fallbackError);
+      // Silent fail - persistence error
     }
   }
 })();

@@ -132,6 +132,37 @@ function App() {
     loadRooms();
   }, [currentLanguage]);
 
+  // Handle deep linking - check for shared room ID in URL
+  useEffect(() => {
+    if (isLoadingRooms || rooms.length === 0) return;
+
+    // Check for room ID in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedRoomId = urlParams.get('room');
+
+    // Also check sessionStorage for room ID stored before login
+    const storedRoomId = sessionStorage.getItem('nivasi_shared_room');
+
+    const roomIdToOpen = sharedRoomId || storedRoomId;
+
+    if (roomIdToOpen) {
+      // Find the room by ID
+      const room = rooms.find(r => String(r.id) === String(roomIdToOpen));
+
+      if (room && isAuthenticated) {
+        // User is authenticated, show the room
+        setSelectedRoom(room);
+        // Clear the stored room ID and URL param
+        sessionStorage.removeItem('nivasi_shared_room');
+        // Clean up URL without refreshing
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (sharedRoomId && !isAuthenticated) {
+        // Store room ID for after login
+        sessionStorage.setItem('nivasi_shared_room', sharedRoomId);
+      }
+    }
+  }, [rooms, isLoadingRooms, isAuthenticated]);
+
   // Load mess data lazily when selected first time
   useEffect(() => {
     const loadMess = async () => {
@@ -235,11 +266,20 @@ function App() {
   // Enhanced filtering with memoization
   const filteredRooms = useMemo(() => {
     return rooms.filter(room => {
-      const matchesGender = selectedGender ?
-        (selectedGender === 'boy' ? (room.gender === 'boy' || room.gender === 'boys') :
-          selectedGender === 'girl' ? (room.gender === 'girl' || room.gender === 'girls') :
-            room.gender === selectedGender)
-        : true;
+      // Gender filtering - only show rooms matching the selected gender
+      let matchesGender = true;
+      if (selectedGender) {
+        const roomGender = (room.gender || '').toLowerCase().trim();
+        if (selectedGender === 'boy') {
+          // Match 'boy', 'boys', 'male' for boys
+          matchesGender = roomGender === 'boy' || roomGender === 'boys' || roomGender === 'male';
+        } else if (selectedGender === 'girl') {
+          // Match 'girl', 'girls', 'female' for girls
+          matchesGender = roomGender === 'girl' || roomGender === 'girls' || roomGender === 'female';
+        } else {
+          matchesGender = roomGender === selectedGender.toLowerCase();
+        }
+      }
       const matchesCategory = roomMatchesCategory(room, category);
       const matchesSearch = room.title && room.title.toLowerCase().includes(search.toLowerCase());
       const matchesPrice = room.rent ? room.rent <= maxPrice : true;
@@ -472,7 +512,7 @@ function App() {
       <div className="w-full flex items-start">
         {/* SIDEBAR - Flipkart Style */}
         {activeSection === 'rooms' && (
-          <aside className="hidden lg:block w-[280px] flex-shrink-0 bg-white min-h-[calc(100vh-65px)] border-r border-gray-200 sticky top-[65px] h-[calc(100vh-65px)] overflow-y-auto custom-scrollbar">
+          <aside className="hidden lg:block w-[280px] flex-shrink-0 bg-white min-h-[calc(100vh-65px)] border-r border-gray-200 sticky top-[65px] h-[calc(100vh-65px)] overflow-y-auto overscroll-contain custom-scrollbar">
             <div className="p-5 space-y-8">
               {/* Header */}
               <div className="flex items-center justify-between">
@@ -535,7 +575,7 @@ function App() {
               <div className="h-px bg-gray-100" />
 
               {/* Features Section */}
-              <div>
+              <div className="pb-8">
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">{t('amenities') || 'Amenities'}</h4>
                 <div className="space-y-3">
                   {availableFeatures.map((feature) => (
@@ -597,7 +637,7 @@ function App() {
                       key={room.id}
                       room={room}
                       onViewDetails={() => setSelectedRoom(room)}
-                      onBook={() => {
+                      onBookNow={() => {
                         setSelectedRoomForBooking(room);
                         setShowBookingModal(true);
                       }}

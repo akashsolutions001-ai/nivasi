@@ -73,10 +73,14 @@ const RoomDetailModal = ({ room, onClose }) => {
   };
 
   const handleShare = async () => {
+    // Create a shareable URL with room ID
+    const baseUrl = window.location.origin;
+    const shareUrl = `${baseUrl}?room=${room.id}`;
+
     const shareData = {
       title: room.title,
-      text: `${t('checkOutRoom')} ${room.title} - ₹${room.rent}/month`,
-      url: window.location.href
+      text: `Check out this room: ${room.title} - Rs.${room.rent}/month on Nivasi Space`,
+      url: shareUrl
     };
 
     if (navigator.share) {
@@ -281,7 +285,8 @@ const RoomDetailModal = ({ room, onClose }) => {
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <Button
                   onClick={handleCall}
-                  className="bg-green-600 hover:bg-green-700 text-white py-3 text-sm font-semibold"
+                  variant="outline"
+                  className="bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-200 hover:border-gray-300 py-3 text-sm font-semibold shadow-sm"
                 >
                   <Phone className="w-4 h-4 mr-2" />
                   {t('callNow')}
@@ -298,16 +303,17 @@ const RoomDetailModal = ({ room, onClose }) => {
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   onClick={handleViewOnMap}
-                  variant="outline"
-                  className="py-3 text-sm font-medium"
+                  className="py-3 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90"
+                  style={{
+                    background: 'linear-gradient(135deg, #4285F4 0%, #34A853 35%, #FBBC05 70%, #EA4335 100%)'
+                  }}
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   {t('viewOnMap')}
                 </Button>
                 <Button
                   onClick={handleShare}
-                  variant="outline"
-                  className="py-3 text-sm font-medium"
+                  className="py-3 text-sm font-semibold bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-500/30 hover:shadow-green-500/50 transition-all duration-300 hover:-translate-y-0.5"
                 >
                   <Share2 className="w-4 h-4 mr-2" />
                   {t('shareRoom')}
