@@ -11,6 +11,7 @@ import { addBooking, bookingTypes, bookingStatuses } from '../data/bookings.js';
 import { openWhatsAppWithBooking, copyBookingMessage } from '../utils/whatsapp.js';
 import { db } from '../firebase.js';
 import { doc, getDoc } from 'firebase/firestore';
+import ConfirmationModal from './ConfirmationModal.jsx';
 
 const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
   const { t } = useLanguage();
@@ -30,6 +31,7 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
   const [submittedBooking, setSubmittedBooking] = useState(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   // Reset form and fetch profile when modal opens
   useEffect(() => {
@@ -129,7 +131,12 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
       return;
     }
 
+    // Show confirmation popup
+    setShowConfirmation(true);
+  };
 
+  const handleConfirmBooking = async () => {
+    setShowConfirmation(false);
     setIsSubmitting(true);
     setSubmitStatus(null);
 
@@ -539,6 +546,19 @@ const BookingModal = ({ isOpen, onClose, room, onBookingSuccess }) => {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        onConfirm={handleConfirmBooking}
+        title="Confirm Booking"
+        message={`Are you sure you want to send a booking request for "${room?.title}"? Your contact details will be shared with the room owner.`}
+        confirmText="Send Booking"
+        cancelText="Cancel"
+        type="info"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 };

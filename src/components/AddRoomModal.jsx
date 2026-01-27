@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button.jsx';
 import { Checkbox } from '@/components/ui/checkbox.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
+import ConfirmationModal from './ConfirmationModal.jsx';
 
 // Predefined features list
 const AVAILABLE_FEATURES = [
@@ -119,6 +120,8 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
   const [submitMessage, setSubmitMessage] = useState('');
   const [mapLinkLoading, setMapLinkLoading] = useState(false);
   const [mapLinkError, setMapLinkError] = useState('');
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [pendingRoomData, setPendingRoomData] = useState(null);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -193,8 +196,8 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
       (err) => {
         const msg = err.code === 1 ? 'Location permission denied.'
           : err.code === 2 ? 'Location unavailable.'
-          : err.code === 3 ? 'Request timed out.'
-          : 'Could not get your location.';
+            : err.code === 3 ? 'Request timed out.'
+              : 'Could not get your location.';
         setMapLinkError(msg);
         setMapLinkLoading(false);
       },
@@ -252,6 +255,79 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
       return;
     }
 
+    // Prepare the room data
+    const billLabels = {
+      lightAndWater: 'Including light and water bill',
+      waterOnly: 'Including water bill only (light separate)',
+      lightOnly: 'Including light bill only (water separate)',
+      none: 'Without including light and water bill'
+    };
+    let note = formData.note.trim();
+    const bl = billLabels[formData.billInclusion];
+    const skipPrepend = /^(including|without)\s+(light|water|bill)/i.test(note);
+    if (bl && !skipPrepend) note = [bl, note].filter(Boolean).join(', ');
+    if (!note) note = undefined;
+
+    const conditionToText = {
+      oneYearAgreement: '1 YEAR AGREEMENT',
+      rent1stTo10th: 'The rent should be paid between the 1st and 10th of each month',
+      rent1stTo5th: 'The rent should be paid between the 1st and 5th of each month',
+      rent25thTo5th: 'The rent should be paid between the 25th and 5th of each month',
+      after10pmNoEntry: 'After 10pm no entry',
+      after11pmNoEntry: 'After 11pm no entry',
+      friendsNotAllowed: 'Friends are not allowed in room',
+      parentsAllowedStay: 'Parents allowed for stay',
+      aadharPhotoParentMandatory: "STUDENT'S addhar card, photo and parent phone number is mandatory",
+      selfCleaning: 'Self Cleaning',
+      selfCookingNotAllowed: 'Self cooking not allowed',
+      noDrinkingSmoking: 'No drinking and smoking allowed in room',
+      goodBehaviour: 'Good Behaviour is required',
+      garbageByStudents: 'Garbage Management by students',
+      groupStudyNotAllowed: 'Group Studies not allowed',
+      entryGateLocked: 'Entry gate locked after hours'
+    };
+    const conditionParts = formData.selectedConditions.map(k => conditionToText[k]).filter(Boolean);
+    const advanceStr = formData.advance && !isNaN(Number(formData.advance)) ? `${formData.advance} Rs. Advance` : '';
+    const depositStr = formData.deposit && !isNaN(Number(formData.deposit)) ? `${formData.deposit} Rs. Deposit` : '';
+    const descParts = [...conditionParts, advanceStr, depositStr, formData.description.trim()].filter(Boolean);
+    const description = descParts.join(' , ');
+
+    const adv = formData.advance != null && formData.advance !== '' && !isNaN(Number(formData.advance)) ? Number(formData.advance) : undefined;
+    const dep = formData.deposit != null && formData.deposit !== '' && !isNaN(Number(formData.deposit)) ? Number(formData.deposit) : undefined;
+
+    const newRoom = {
+      id: isEdit && initialRoom ? initialRoom.id : Date.now(),
+      title: formData.title.trim(),
+      rent: parseInt(formData.rent),
+      pricingType: formData.pricingType,
+      note: note || undefined,
+      contact: formData.contact.trim(),
+      address: formData.address.trim(),
+      location: formData.location.trim(),
+      mapLink: formData.mapLink.trim(),
+      city: formData.city.trim() || undefined,
+      college: formData.college.trim() || undefined,
+      roomType: formData.roomType,
+      rooms: formData.roomType,
+      description: description || '',
+      features: formData.selectedFeatures,
+      gender: formData.gender,
+      images: formData.images.length > 0 ? formData.images : ['/api/placeholder/400/300'],
+      billInclusion: formData.billInclusion,
+      selectedConditions: formData.selectedConditions,
+      ...(adv != null && !isNaN(adv) ? { advance: adv } : {}),
+      ...(dep != null && !isNaN(dep) ? { deposit: dep } : {})
+    };
+
+    // Store room data and show confirmation
+    setPendingRoomData(newRoom);
+    setShowConfirmation(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    if (!pendingRoomData) return;
+
+    setShowConfirmation(false);
     setIsSubmitting(true);
     setSubmitMessage('');
 
@@ -259,70 +335,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const billLabels = {
-        lightAndWater: 'Including light and water bill',
-        waterOnly: 'Including water bill only (light separate)',
-        lightOnly: 'Including light bill only (water separate)',
-        none: 'Without including light and water bill'
-      };
-      let note = formData.note.trim();
-      const bl = billLabels[formData.billInclusion];
-      const skipPrepend = /^(including|without)\s+(light|water|bill)/i.test(note);
-      if (bl && !skipPrepend) note = [bl, note].filter(Boolean).join(', ');
-      if (!note) note = undefined;
-
-      const conditionToText = {
-        oneYearAgreement: '1 YEAR AGREEMENT',
-        rent1stTo10th: 'The rent should be paid between the 1st and 10th of each month',
-        rent1stTo5th: 'The rent should be paid between the 1st and 5th of each month',
-        rent25thTo5th: 'The rent should be paid between the 25th and 5th of each month',
-        after10pmNoEntry: 'After 10pm no entry',
-        after11pmNoEntry: 'After 11pm no entry',
-        friendsNotAllowed: 'Friends are not allowed in room',
-        parentsAllowedStay: 'Parents allowed for stay',
-        aadharPhotoParentMandatory: "STUDENT'S addhar card, photo and parent phone number is mandatory",
-        selfCleaning: 'Self Cleaning',
-        selfCookingNotAllowed: 'Self cooking not allowed',
-        noDrinkingSmoking: 'No drinking and smoking allowed in room',
-        goodBehaviour: 'Good Behaviour is required',
-        garbageByStudents: 'Garbage Management by students',
-        groupStudyNotAllowed: 'Group Studies not allowed',
-        entryGateLocked: 'Entry gate locked after hours'
-      };
-      const conditionParts = formData.selectedConditions.map(k => conditionToText[k]).filter(Boolean);
-      const advanceStr = formData.advance && !isNaN(Number(formData.advance)) ? `${formData.advance} Rs. Advance` : '';
-      const depositStr = formData.deposit && !isNaN(Number(formData.deposit)) ? `${formData.deposit} Rs. Deposit` : '';
-      const descParts = [...conditionParts, advanceStr, depositStr, formData.description.trim()].filter(Boolean);
-      const description = descParts.join(' , ');
-
-      const adv = formData.advance != null && formData.advance !== '' && !isNaN(Number(formData.advance)) ? Number(formData.advance) : undefined;
-      const dep = formData.deposit != null && formData.deposit !== '' && !isNaN(Number(formData.deposit)) ? Number(formData.deposit) : undefined;
-
-      const newRoom = {
-        id: isEdit && initialRoom ? initialRoom.id : Date.now(),
-        title: formData.title.trim(),
-        rent: parseInt(formData.rent),
-        pricingType: formData.pricingType,
-        note: note || undefined,
-        contact: formData.contact.trim(),
-        address: formData.address.trim(),
-        location: formData.location.trim(),
-        mapLink: formData.mapLink.trim(),
-        city: formData.city.trim() || undefined,
-        college: formData.college.trim() || undefined,
-        roomType: formData.roomType,
-        rooms: formData.roomType,
-        description: description || '',
-        features: formData.selectedFeatures,
-        gender: formData.gender,
-        images: formData.images.length > 0 ? formData.images : ['/api/placeholder/400/300'],
-        billInclusion: formData.billInclusion,
-        selectedConditions: formData.selectedConditions,
-        ...(adv != null && !isNaN(adv) ? { advance: adv } : {}),
-        ...(dep != null && !isNaN(dep) ? { deposit: dep } : {})
-      };
-
-      onAddRoom(newRoom);
+      onAddRoom(pendingRoomData);
       setSubmitMessage(isEdit ? t('roomUpdatedSuccessfully') : t('roomAddedSuccessfully'));
 
       // Close modal after success
@@ -334,6 +347,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
       setSubmitMessage(t('errorAddingRoom'));
     } finally {
       setIsSubmitting(false);
+      setPendingRoomData(null);
     }
   };
 
@@ -426,11 +440,11 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.contact ? 'border-red-500' : 'border-gray-300'
                     }`}
                 />
-              {errors.contact && (
-                <p className="text-red-500 text-sm mt-1">{errors.contact}</p>
-              )}
+                {errors.contact && (
+                  <p className="text-red-500 text-sm mt-1">{errors.contact}</p>
+                )}
+              </div>
             </div>
-          </div>
 
             {/* Bill inclusion (light/water) */}
             <div>
@@ -808,6 +822,26 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
           </div>
         </form>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmation}
+        onClose={() => {
+          setShowConfirmation(false);
+          setPendingRoomData(null);
+        }}
+        onConfirm={handleConfirmSubmit}
+        title={isEdit ? 'Update Room' : 'Add Room'}
+        message={
+          isEdit
+            ? `Are you sure you want to update "${formData.title}"? The changes will be visible to all students.`
+            : `Are you sure you want to add "${formData.title}"? This room will be visible to all students.`
+        }
+        confirmText={isEdit ? 'Update' : 'Add Room'}
+        cancelText="Cancel"
+        type="success"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 };

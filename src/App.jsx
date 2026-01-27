@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button.jsx';
 import { Checkbox } from '@/components/ui/checkbox.jsx';
 import { Slider } from '@/components/ui/slider.jsx';
 import RoomCard from './components/RoomCard.jsx';
-import Notification from './components/Notification.jsx';
+import InAppToast from './components/InAppToast.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
 
 import { useLanguage } from './contexts/LanguageContext.jsx';
@@ -97,7 +97,7 @@ function App() {
   const [search, setSearch] = useState('');
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
-  const [notification, setNotification] = useState({ message: '', type: 'success', isVisible: false });
+  const [notification, setNotification] = useState({ message: '', type: 'success', isVisible: false, title: '' });
 
   const [showFeatureFilter, setShowFeatureFilter] = useState(false);
   const [featureFilters, setFeatureFilters] = useState({});
@@ -333,6 +333,12 @@ function App() {
     setIsAdmin(true);
     setShowAdminLogin(false);
     setShowAddForm(true);
+    setNotification({
+      message: 'You now have access to add, edit, and delete rooms.',
+      type: 'success',
+      isVisible: true,
+      title: 'Admin Mode Activated!'
+    });
   }, [setIsAdmin]);
 
   const handleAddRoom = useCallback(async (newRoom) => {
@@ -342,9 +348,10 @@ function App() {
       setRooms(prev => deduplicateRooms([savedRoom, ...prev]));
       setShowAddForm(false);
       setNotification({
-        message: 'Room added successfully!',
+        message: 'Your new room listing is now live and visible to students.',
         type: 'success',
-        isVisible: true
+        isVisible: true,
+        title: 'Room Added Successfully!'
       });
     } catch (error) {
       console.error('Error adding room:', error);
@@ -352,9 +359,10 @@ function App() {
       setRooms(prev => deduplicateRooms([newRoom, ...prev]));
       setShowAddForm(false);
       setNotification({
-        message: 'Room added locally (sync pending)',
+        message: 'Room saved locally. Will sync when connection is restored.',
         type: 'warning',
-        isVisible: true
+        isVisible: true,
+        title: 'Room Saved Locally'
       });
     }
   }, []);
@@ -363,9 +371,10 @@ function App() {
     setShowBookingModal(false);
     setSelectedRoomForBooking(null);
     setNotification({
-      message: t('bookingSubmitted'),
+      message: 'Your booking request has been submitted. The owner will contact you soon.',
       type: 'success',
-      isVisible: true
+      isVisible: true,
+      title: 'Booking Submitted!'
     });
   }, [t]);
 
@@ -376,9 +385,10 @@ function App() {
       setRooms(prev => deduplicateRooms(prev.map(r => r.id === savedRoom.id ? savedRoom : r)));
       setEditRoom(null);
       setNotification({
-        message: 'Room updated successfully!',
+        message: 'Your room listing has been updated with the new details.',
         type: 'success',
-        isVisible: true
+        isVisible: true,
+        title: 'Room Updated Successfully!'
       });
     } catch (error) {
       console.error('Error updating room:', error);
@@ -386,9 +396,10 @@ function App() {
       setRooms(prev => deduplicateRooms(prev.map(r => r.id === updatedRoom.id ? updatedRoom : r)));
       setEditRoom(null);
       setNotification({
-        message: 'Room updated locally (sync pending)',
+        message: 'Changes saved locally. Will sync when connection is restored.',
         type: 'warning',
-        isVisible: true
+        isVisible: true,
+        title: 'Room Updated Locally'
       });
     }
   }, []);
@@ -420,9 +431,10 @@ function App() {
         )
       ));
       setNotification({
-        message: 'Room deleted successfully',
+        message: 'The room has been removed from the listings.',
         type: 'success',
-        isVisible: true
+        isVisible: true,
+        title: 'Room Deleted Successfully!'
       });
       setIsDeleting(false);
       setRoomToDelete(null);
@@ -455,11 +467,13 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      <Notification
+      <InAppToast
         message={notification.message}
         type={notification.type}
         isVisible={notification.isVisible}
+        title={notification.title}
         onClose={() => setNotification(prev => ({ ...prev, isVisible: false }))}
+        duration={4000}
       />
 
       {/* Sticky Search & Controls Header */}

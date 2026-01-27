@@ -835,3 +835,59 @@ button[data-slot="button"].book-now-btn-high-contrast:hover {
 .visit-room-btn-attractive .animate-ping {
   animation: locationPulse 2s infinite;
 }
+
+/* Mobile Scroll Fix - Ensure page is scrollable */
+html,
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  position: relative;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for mobile */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Fix for iOS Safari scroll bounce */
+@supports (-webkit-touch-callout: none) {
+  html, body, #root {
+    height: 100%;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Prevent body scroll when modal is open */
+body.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+/* Toast and modal z-index hierarchy */
+.z-\[100\] {
+  z-index: 100 !important;
+}
+
+/* Ensure modals don't block scroll when not visible */
+.pointer-events-none {
+  pointer-events: none;
+}
+
+.pointer-events-auto {
+  pointer-events: auto;
+}
