@@ -46,33 +46,43 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, isFirst, onBookNo
     }
   }, [onBookNow, room]);
 
+  // Safely normalize image URLs so they work in src attributes.
+  // - Encodes spaces so paths like "/Ayan Mulla/..." work
+  // - Leaves blob: URLs (used for newly added rooms) untouched
+  const getSafeImageUrl = useCallback((url) => {
+    if (!url || typeof url !== 'string') return null;
+    if (url.startsWith('blob:')) return url;
+    // Encode only spaces to avoid breaking already-encoded URLs
+    return url.replace(/ /g, '%20');
+  }, []);
+
+  const primaryImage = room.images && room.images.length > 0 ? getSafeImageUrl(room.images[0]) : null;
+
   return (
     <div className="room-card p-4 hover-lift h-full flex flex-col">
       {/* Image Section (only first image visible) */}
       <div className="relative mb-4 overflow-hidden rounded-xl flex-shrink-0">
         <div className="w-full h-48 md:h-56 lg:h-64 bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center">
-          {room.images && room.images.length > 0 ? (
-            <picture className="h-full w-full flex-shrink-0 cursor-pointer" onClick={onViewDetails}>
-              <source srcSet={room.images[0]?.replace(/\.(jpg|jpeg|png)$/i, '.avif')} type="image/avif" />
-              <source srcSet={room.images[0]?.replace(/\.(jpg|jpeg|png)$/i, '.webp')} type="image/webp" />
+          {primaryImage ? (
+            <div className="h-full w-full flex-shrink-0 cursor-pointer" onClick={onViewDetails}>
               <img
-                src={room.images[0]}
+                src={primaryImage}
                 alt={`${room.title} - 1`}
                 className="h-44 md:h-52 lg:h-60 w-full object-cover rounded-lg border border-orange-100 hover:scale-105 transition-transform"
                 loading={isFirst ? "eager" : 'lazy'}
                 decoding="sync"
                 onError={e => {
-                  console.error(`Failed to load image: ${room.images[0]}`, e);
+                  console.error(`Failed to load image: ${primaryImage}`, e);
                   console.error('Room data:', room);
                   e.target.style.display = 'none';
                 }}
                 onLoad={() => {
                   if (isFirst) {
-                    console.log(`Successfully loaded critical image: ${room.images[0]}`);
+                    console.log(`Successfully loaded critical image: ${primaryImage}`);
                   }
                 }}
               />
-            </picture>
+            </div>
           ) : (
             <div className="text-center w-full">
               <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-2">
@@ -94,16 +104,14 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, isFirst, onBookNo
           <button onClick={() => setModalOpen(false)} className="absolute top-4 right-4 z-10 text-white bg-black/60 rounded-full p-2 hover:bg-black/80"><XIcon className="w-6 h-6" /></button>
           <div className="relative w-full flex items-center justify-center" style={{ minHeight: '60vh' }}>
             <button onClick={handlePrevImage} className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-orange-400 rounded-full p-2"><ChevronLeft className="w-7 h-7 text-black" /></button>
-            <picture className="flex-grow flex items-center justify-center">
-              <source srcSet={room.images[modalImageIdx]?.replace(/\.(jpg|jpeg|png)$/i, '.avif')} type="image/avif" />
-              <source srcSet={room.images[modalImageIdx]?.replace(/\.(jpg|jpeg|png)$/i, '.webp')} type="image/webp" />
+            <div className="flex-grow flex items-center justify-center">
               <img
-                src={room.images[modalImageIdx]}
+                src={getSafeImageUrl(room.images[modalImageIdx])}
                 alt={`${room.title} - Fullscreen ${modalImageIdx + 1}`}
                 className="object-contain max-h-[70vh] max-w-full rounded-lg shadow-2xl mx-auto"
                 style={{ background: '#222' }}
               />
-            </picture>
+            </div>
             <button onClick={handleNextImage} className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-orange-400 rounded-full p-2"><ChevronRight className="w-7 h-7 text-black" /></button>
           </div>
           {/* Thumbnails */}
@@ -111,7 +119,7 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, isFirst, onBookNo
             {room.images.map((img, idx) => (
               <img
                 key={idx}
-                src={img}
+                src={getSafeImageUrl(img)}
                 alt={`Thumb ${idx + 1}`}
                 className={`h-14 w-24 object-cover rounded cursor-pointer border-2 transition-all duration-300 ${idx === modalImageIdx ? 'border-orange-400 shadow-lg ring-2 ring-orange-400' : 'border-transparent opacity-70 hover:opacity-100'}`}
                 onClick={() => setModalImageIdx(idx)}

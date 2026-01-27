@@ -11,10 +11,30 @@ export const fetchRooms = async () => {
         const roomsRef = collection(db, ROOMS_COLLECTION);
         const snapshot = await getDocs(roomsRef);
 
-        const rooms = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
+        // Deduplicate rooms that may have been created multiple times
+        // (e.g. once during initial migration and again via the admin "Sync" action).
+        // We treat rooms with the same title + contact + gender as the same logical room.
+        const seenKeys = new Set();
+        const rooms = [];
+
+        snapshot.docs.forEach(docSnap => {
+            const data = docSnap.data() || {};
+            const keyParts = [
+                (data.title || '').toString().trim().toLowerCase(),
+                (data.contact || '').toString().trim().toLowerCase(),
+                (data.gender || '').toString().trim().toLowerCase(),
+            ];
+
+            const compositeKey = keyParts.join('|');
+
+            if (!seenKeys.has(compositeKey)) {
+                seenKeys.add(compositeKey);
+                rooms.push({
+                    id: docSnap.id,
+                    ...data,
+                });
+            }
+        });
 
         return rooms;
     } catch (error) {

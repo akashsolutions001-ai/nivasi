@@ -81,7 +81,6 @@ function App() {
   const [maxPrice, setMaxPrice] = useState(10000);
   const [activeSection, setActiveSection] = useState('rooms'); // 'rooms' | 'mess'
   const [messItems, setMessItems] = useState([]);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   // iOS Debug logging
   useEffect(() => {
@@ -451,51 +450,6 @@ function App() {
                 <Filter className="w-4 h-4 mr-2" />
                 Filters
               </Button>
-              {isAdmin && (
-                <Button
-                  onClick={async () => {
-                    setIsSyncing(true);
-                    try {
-                      const { sampleRooms } = await import('./data/rooms.js');
-                      const { db, collection, doc, setDoc } = await import('./firebase.js');
-
-                      for (const room of sampleRooms) {
-                        const roomRef = doc(collection(db, 'rooms'), String(room.id));
-                        await setDoc(roomRef, {
-                          ...room,
-                          id: String(room.id)
-                        });
-                      }
-
-                      setNotification({
-                        message: `Synced ${sampleRooms.length} rooms to Firebase!`,
-                        type: 'success',
-                        isVisible: true
-                      });
-
-                      // Reload rooms from Firestore
-                      const { fetchRooms } = await import('./services/roomService.js');
-                      const updatedRooms = await fetchRooms();
-                      setRooms(updatedRooms);
-                    } catch (error) {
-                      console.error('Sync error:', error);
-                      setNotification({
-                        message: 'Sync failed: ' + error.message,
-                        type: 'error',
-                        isVisible: true
-                      });
-                    } finally {
-                      setIsSyncing(false);
-                    }
-                  }}
-                  size="sm"
-                  variant="outline"
-                  disabled={isSyncing}
-                  className="bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap text-xs sm:text-sm"
-                >
-                  {isSyncing ? 'Syncing...' : <><span className="hidden sm:inline">⬆ Sync to Firebase</span><span className="sm:hidden">⬆ Sync</span></>}
-                </Button>
-              )}
               <Button
                 onClick={handleShowAddForm}
                 size="sm"
