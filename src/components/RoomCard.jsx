@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 
-const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, isFirst, onBookNow }) => {
+const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst, onBookNow }) => {
   const { t } = useLanguage();
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImageIdx, setModalImageIdx] = useState(0);
@@ -207,15 +207,25 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, isFirst, onBookNo
           </Button>
         </div>
 
-        {/* Edit Button for Admins */}
+        {/* Admin Actions */}
         {isAdmin && (
-          <Button
-            onClick={handleEdit}
-            className="btn-secondary w-full flex items-center justify-center gap-2 mt-2"
-            size="sm"
-          >
-            {t('update')}
-          </Button>
+          <div className="flex flex-col gap-2 mt-2">
+            <Button
+              onClick={handleEdit}
+              className="btn-secondary w-full flex items-center justify-center gap-2"
+              size="sm"
+            >
+              {t('update')}
+            </Button>
+            <Button
+              onClick={onDelete}
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
+              size="sm"
+            >
+              Delete
+            </Button>
+          </div>
         )}
       </div>
     </div>

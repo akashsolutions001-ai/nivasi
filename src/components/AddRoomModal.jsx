@@ -8,7 +8,8 @@ import {
   FileText,
   Check,
   AlertCircle,
-  Trash2
+  Trash2,
+  Locate
 } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Checkbox } from '@/components/ui/checkbox.jsx';
@@ -38,6 +39,37 @@ const AVAILABLE_FEATURES = [
   'Water Supply'
 ];
 
+// Bill inclusion options (mutually exclusive)
+const BILL_INCLUSION_OPTIONS = [
+  { value: 'lightAndWater', label: 'Including light and water bill' },
+  { value: 'waterOnly', label: 'Water bill only (light separate)' },
+  { value: 'lightOnly', label: 'Light bill only (water separate)' },
+  { value: 'none', label: 'Neither (light and water extra)' }
+];
+
+// Room type options (matches rooms.js and App categories)
+const ROOM_TYPE_OPTIONS = ['Single Room', 'Cot Basis', '1 RK', '1 BHK', '2 BHK'];
+
+// Conditions checkboxes (from common patterns in room descriptions)
+const CONDITION_OPTIONS = [
+  { key: 'oneYearAgreement', label: '1 Year Agreement' },
+  { key: 'rent1stTo10th', label: 'Rent between 1st–10th of month' },
+  { key: 'rent1stTo5th', label: 'Rent between 1st–5th of month' },
+  { key: 'rent25thTo5th', label: 'Rent between 25th–5th of month' },
+  { key: 'after10pmNoEntry', label: 'After 10pm no entry' },
+  { key: 'after11pmNoEntry', label: 'After 11pm no entry' },
+  { key: 'friendsNotAllowed', label: 'Friends not allowed in room' },
+  { key: 'parentsAllowedStay', label: 'Parents allowed for stay' },
+  { key: 'aadharPhotoParentMandatory', label: 'Aadhar, photo & parent phone mandatory' },
+  { key: 'selfCleaning', label: 'Self cleaning required' },
+  { key: 'selfCookingNotAllowed', label: 'Self cooking not allowed' },
+  { key: 'noDrinkingSmoking', label: 'No drinking/smoking' },
+  { key: 'goodBehaviour', label: 'Good behaviour required' },
+  { key: 'garbageByStudents', label: 'Garbage management by students' },
+  { key: 'groupStudyNotAllowed', label: 'Group study not allowed' },
+  { key: 'entryGateLocked', label: 'Entry gate locked after hours' }
+];
+
 const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
   const { t } = useLanguage();
   const [formData, setFormData] = useState(() => initialRoom ? {
@@ -47,10 +79,19 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
     address: initialRoom.address || '',
     location: initialRoom.location || '',
     mapLink: initialRoom.mapLink || '',
+    city: initialRoom.city || '',
+    college: initialRoom.college || '',
+    note: initialRoom.note || '',
     description: initialRoom.description || '',
     selectedFeatures: initialRoom.features || [],
     gender: initialRoom.gender || 'boy',
-    images: initialRoom.images || []
+    images: initialRoom.images || [],
+    billInclusion: initialRoom.billInclusion || 'lightAndWater',
+    roomType: initialRoom.roomType || initialRoom.rooms || '1 RK',
+    pricingType: initialRoom.pricingType || 'perStudent',
+    selectedConditions: initialRoom.selectedConditions || [],
+    advance: initialRoom.advance ?? '',
+    deposit: initialRoom.deposit ?? ''
   } : {
     title: '',
     rent: '',
@@ -58,15 +99,26 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
     address: '',
     location: '',
     mapLink: '',
+    city: '',
+    college: '',
+    note: '',
     description: '',
     selectedFeatures: [],
     gender: 'boy',
-    images: []
+    images: [],
+    billInclusion: 'lightAndWater',
+    roomType: '1 RK',
+    pricingType: 'perStudent',
+    selectedConditions: [],
+    advance: '',
+    deposit: ''
   });
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
+  const [mapLinkLoading, setMapLinkLoading] = useState(false);
+  const [mapLinkError, setMapLinkError] = useState('');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -77,11 +129,9 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
 
     // Clear error when user starts typing
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors(prev => ({ ...prev, [name]: '' }));
     }
+    if (name === 'mapLink' && mapLinkError) setMapLinkError('');
   };
 
   const handleFeatureToggle = (feature) => {
@@ -92,6 +142,18 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
         selectedFeatures: isSelected
           ? prev.selectedFeatures.filter(f => f !== feature)
           : [...prev.selectedFeatures, feature]
+      };
+    });
+  };
+
+  const handleConditionToggle = (key) => {
+    setFormData(prev => {
+      const isSelected = prev.selectedConditions.includes(key);
+      return {
+        ...prev,
+        selectedConditions: isSelected
+          ? prev.selectedConditions.filter(k => k !== key)
+          : [...prev.selectedConditions, key]
       };
     });
   };
@@ -111,6 +173,33 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
       ...prev,
       images: prev.images.filter((_, i) => i !== index)
     }));
+  };
+
+  const handleFetchMyLocation = () => {
+    setMapLinkError('');
+    if (!navigator.geolocation) {
+      setMapLinkError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setMapLinkLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const url = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        setFormData(prev => ({ ...prev, mapLink: url }));
+        if (errors.mapLink) setErrors(prev => ({ ...prev, mapLink: '' }));
+        setMapLinkLoading(false);
+      },
+      (err) => {
+        const msg = err.code === 1 ? 'Location permission denied.'
+          : err.code === 2 ? 'Location unavailable.'
+          : err.code === 3 ? 'Request timed out.'
+          : 'Could not get your location.';
+        setMapLinkError(msg);
+        setMapLinkLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
   };
 
   const validateForm = () => {
@@ -140,12 +229,8 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
 
     if (!formData.mapLink.trim()) {
       newErrors.mapLink = t('mapLinkRequired');
-    } else if (!formData.mapLink.includes('maps.google.com') && !formData.mapLink.includes('goo.gl')) {
+    } else if (!/google\.com\/maps|maps\.google\.com|goo\.gl|maps\.app\.goo\.gl/i.test(formData.mapLink)) {
       newErrors.mapLink = t('validMapLink');
-    }
-
-    if (!formData.description.trim()) {
-      newErrors.description = t('descriptionRequired');
     }
 
     if (!formData.gender) {
@@ -174,18 +259,67 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));
 
+      const billLabels = {
+        lightAndWater: 'Including light and water bill',
+        waterOnly: 'Including water bill only (light separate)',
+        lightOnly: 'Including light bill only (water separate)',
+        none: 'Without including light and water bill'
+      };
+      let note = formData.note.trim();
+      const bl = billLabels[formData.billInclusion];
+      const skipPrepend = /^(including|without)\s+(light|water|bill)/i.test(note);
+      if (bl && !skipPrepend) note = [bl, note].filter(Boolean).join(', ');
+      if (!note) note = undefined;
+
+      const conditionToText = {
+        oneYearAgreement: '1 YEAR AGREEMENT',
+        rent1stTo10th: 'The rent should be paid between the 1st and 10th of each month',
+        rent1stTo5th: 'The rent should be paid between the 1st and 5th of each month',
+        rent25thTo5th: 'The rent should be paid between the 25th and 5th of each month',
+        after10pmNoEntry: 'After 10pm no entry',
+        after11pmNoEntry: 'After 11pm no entry',
+        friendsNotAllowed: 'Friends are not allowed in room',
+        parentsAllowedStay: 'Parents allowed for stay',
+        aadharPhotoParentMandatory: "STUDENT'S addhar card, photo and parent phone number is mandatory",
+        selfCleaning: 'Self Cleaning',
+        selfCookingNotAllowed: 'Self cooking not allowed',
+        noDrinkingSmoking: 'No drinking and smoking allowed in room',
+        goodBehaviour: 'Good Behaviour is required',
+        garbageByStudents: 'Garbage Management by students',
+        groupStudyNotAllowed: 'Group Studies not allowed',
+        entryGateLocked: 'Entry gate locked after hours'
+      };
+      const conditionParts = formData.selectedConditions.map(k => conditionToText[k]).filter(Boolean);
+      const advanceStr = formData.advance && !isNaN(Number(formData.advance)) ? `${formData.advance} Rs. Advance` : '';
+      const depositStr = formData.deposit && !isNaN(Number(formData.deposit)) ? `${formData.deposit} Rs. Deposit` : '';
+      const descParts = [...conditionParts, advanceStr, depositStr, formData.description.trim()].filter(Boolean);
+      const description = descParts.join(' , ');
+
+      const adv = formData.advance != null && formData.advance !== '' && !isNaN(Number(formData.advance)) ? Number(formData.advance) : undefined;
+      const dep = formData.deposit != null && formData.deposit !== '' && !isNaN(Number(formData.deposit)) ? Number(formData.deposit) : undefined;
+
       const newRoom = {
         id: isEdit && initialRoom ? initialRoom.id : Date.now(),
         title: formData.title.trim(),
         rent: parseInt(formData.rent),
+        pricingType: formData.pricingType,
+        note: note || undefined,
         contact: formData.contact.trim(),
         address: formData.address.trim(),
         location: formData.location.trim(),
         mapLink: formData.mapLink.trim(),
-        description: formData.description.trim(),
+        city: formData.city.trim() || undefined,
+        college: formData.college.trim() || undefined,
+        roomType: formData.roomType,
+        rooms: formData.roomType,
+        description: description || '',
         features: formData.selectedFeatures,
         gender: formData.gender,
-        images: formData.images.length > 0 ? formData.images : ['/api/placeholder/400/300']
+        images: formData.images.length > 0 ? formData.images : ['/api/placeholder/400/300'],
+        billInclusion: formData.billInclusion,
+        selectedConditions: formData.selectedConditions,
+        ...(adv != null && !isNaN(adv) ? { advance: adv } : {}),
+        ...(dep != null && !isNaN(dep) ? { deposit: dep } : {})
       };
 
       onAddRoom(newRoom);
@@ -292,9 +426,75 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.contact ? 'border-red-500' : 'border-gray-300'
                     }`}
                 />
-                {errors.contact && (
-                  <p className="text-red-500 text-sm mt-1">{errors.contact}</p>
-                )}
+              {errors.contact && (
+                <p className="text-red-500 text-sm mt-1">{errors.contact}</p>
+              )}
+            </div>
+          </div>
+
+            {/* Bill inclusion (light/water) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Rent includes</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {BILL_INCLUSION_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-all ${formData.billInclusion === opt.value ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:bg-orange-50/50'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="billInclusion"
+                      value={opt.value}
+                      checked={formData.billInclusion === opt.value}
+                      onChange={handleInputChange}
+                      className="w-4 h-4 text-orange-600"
+                    />
+                    <span className="text-sm text-gray-700">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Note (short, for card under price) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Note (e.g. 2 girls required, 3 boys required)</label>
+              <input
+                type="text"
+                name="note"
+                value={formData.note}
+                onChange={handleInputChange}
+                placeholder="e.g. 2 girls required in this room"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Room Type and Pricing Type */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Room Type *</label>
+                <select
+                  name="roomType"
+                  value={formData.roomType}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {ROOM_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Pricing *</label>
+                <div className="flex gap-4">
+                  <label className={`flex items-center gap-2 cursor-pointer ${formData.pricingType === 'perRoom' ? 'text-orange-600 font-medium' : ''}`}>
+                    <input type="radio" name="pricingType" value="perRoom" checked={formData.pricingType === 'perRoom'} onChange={handleInputChange} className="w-4 h-4" />
+                    Per room
+                  </label>
+                  <label className={`flex items-center gap-2 cursor-pointer ${formData.pricingType === 'perStudent' ? 'text-orange-600 font-medium' : ''}`}>
+                    <input type="radio" name="pricingType" value="perStudent" checked={formData.pricingType === 'perStudent'} onChange={handleInputChange} className="w-4 h-4" />
+                    Per student
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -351,30 +551,115 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.mapLink ? 'border-red-500' : 'border-gray-300'
                     }`}
                 />
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleFetchMyLocation}
+                    disabled={mapLinkLoading || isSubmitting}
+                    className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                  >
+                    <Locate className="w-4 h-4 mr-1.5" />
+                    {mapLinkLoading ? 'Fetching…' : 'Use my current location'}
+                  </Button>
+                </div>
+                {mapLinkError && (
+                  <p className="text-red-500 text-sm mt-1">{mapLinkError}</p>
+                )}
                 {errors.mapLink && (
                   <p className="text-red-500 text-sm mt-1">{errors.mapLink}</p>
                 )}
               </div>
             </div>
 
-            {/* Description */}
+            {/* City and College (optional) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">City (optional)</label>
+                <input
+                  type="text"
+                  name="city"
+                  value={formData.city}
+                  onChange={handleInputChange}
+                  placeholder="e.g. Kolhapur"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">College (optional)</label>
+                <input
+                  type="text"
+                  name="college"
+                  value={formData.college}
+                  onChange={handleInputChange}
+                  placeholder="e.g. DYPSN Kolhapur"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Conditions (checkboxes) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Conditions</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[28vh] overflow-y-auto p-1">
+                {CONDITION_OPTIONS.map((c) => (
+                  <label
+                    key={c.key}
+                    className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${formData.selectedConditions.includes(c.key) ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:bg-orange-50/50'}`}
+                  >
+                    <Checkbox
+                      checked={formData.selectedConditions.includes(c.key)}
+                      onCheckedChange={() => handleConditionToggle(c.key)}
+                      className="data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500 w-4 h-4"
+                    />
+                    <span className="text-sm text-gray-700">{c.label}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Advance (Rs)</label>
+                  <input
+                    type="number"
+                    name="advance"
+                    value={formData.advance}
+                    onChange={handleInputChange}
+                    placeholder="e.g. 2000"
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Deposit (Rs)</label>
+                  <input
+                    type="number"
+                    name="deposit"
+                    value={formData.deposit}
+                    onChange={handleInputChange}
+                    placeholder="e.g. 1000"
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">Selected: {formData.selectedConditions.length} conditions</p>
+            </div>
+
+            {/* Description (additional, optional) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <FileText className="w-4 h-4 inline mr-1" />
-                {t('description')} *
+                {t('description')} (additional, optional)
               </label>
               <textarea
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
-                placeholder={t('descriptionPlaceholder')}
+                placeholder="Any other conditions or details..."
                 rows="3"
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.description ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {errors.description && (
-                <p className="text-red-500 text-sm mt-1">{errors.description}</p>
-              )}
             </div>
 
             {/* Features Selection */}

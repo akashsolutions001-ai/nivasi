@@ -4,6 +4,18 @@ import { db, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, serverTimes
 const ROOMS_COLLECTION = 'rooms';
 
 /**
+ * Remove keys with undefined so Firestore gets only defined values
+ */
+function omitUndefined(obj) {
+  if (obj == null) return obj;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
+
+/**
  * Fetch all rooms from Firestore
  */
 export const fetchRooms = async () => {
@@ -50,11 +62,11 @@ export const addRoom = async (roomData) => {
     try {
         const roomsRef = collection(db, ROOMS_COLLECTION);
 
-        const roomToAdd = {
+        const roomToAdd = omitUndefined({
             ...roomData,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
-        };
+        });
 
         // Remove the local id if present (Firestore will generate its own)
         delete roomToAdd.id;
@@ -78,10 +90,10 @@ export const updateRoom = async (roomId, roomData) => {
     try {
         const roomRef = doc(db, ROOMS_COLLECTION, roomId);
 
-        const roomToUpdate = {
+        const roomToUpdate = omitUndefined({
             ...roomData,
             updatedAt: serverTimestamp()
-        };
+        });
 
         // Remove id from the data (it's in the document path)
         delete roomToUpdate.id;

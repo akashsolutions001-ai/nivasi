@@ -59,6 +59,29 @@ const normalizeFeature = (feature) => {
   return lower.replace(/\b\w/g, l => l.toUpperCase());
 };
 
+// Deduplicate rooms by a logical composite key
+const deduplicateRooms = (rooms) => {
+  const seen = new Set();
+  const result = [];
+
+  rooms.forEach((room) => {
+    if (!room) return;
+    const key = [
+      (room.title || '').toString().trim().toLowerCase(),
+      (room.contact || '').toString().trim().toLowerCase(),
+      (room.gender || '').toString().trim().toLowerCase(),
+      (room.location || '').toString().trim().toLowerCase(),
+    ].join('|');
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(room);
+    }
+  });
+
+  return result;
+};
+
 function App() {
   const { t, currentLanguage } = useLanguage();
   const { user, loading, isAuthenticated } = useAuth();
@@ -81,6 +104,8 @@ function App() {
   const [maxPrice, setMaxPrice] = useState(10000);
   const [activeSection, setActiveSection] = useState('rooms'); // 'rooms' | 'mess'
   const [messItems, setMessItems] = useState([]);
+  const [roomToDelete, setRoomToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // iOS Debug logging
   useEffect(() => {
@@ -111,14 +136,14 @@ function App() {
           firestoreRooms = await migrateRoomsToFirestore(sampleRooms);
         }
 
-        setRooms(firestoreRooms);
+        setRooms(deduplicateRooms(firestoreRooms));
       } catch (error) {
         console.error('Failed to load rooms from Firestore, falling back to static data:', error);
         // Fallback to static data
         try {
           const { getTranslatedRooms } = await import('./data/rooms.js');
           const translatedRooms = getTranslatedRooms(currentLanguage);
-          setRooms(translatedRooms);
+          setRooms(deduplicateRooms(translatedRooms));
         } catch (fallbackError) {
           console.error('Fallback also failed:', fallbackError);
           setRooms([]);
@@ -314,7 +339,7 @@ function App() {
     try {
       const { addRoom } = await import('./services/roomService.js');
       const savedRoom = await addRoom(newRoom);
-      setRooms(prev => [savedRoom, ...prev]);
+      setRooms(prev => deduplicateRooms([savedRoom, ...prev]));
       setShowAddForm(false);
       setNotification({
         message: 'Room added successfully!',
@@ -324,7 +349,7 @@ function App() {
     } catch (error) {
       console.error('Error adding room:', error);
       // Still add locally even if Firestore fails
-      setRooms(prev => [newRoom, ...prev]);
+      setRooms(prev => deduplicateRooms([newRoom, ...prev]));
       setShowAddForm(false);
       setNotification({
         message: 'Room added locally (sync pending)',
@@ -348,7 +373,7 @@ function App() {
     try {
       const { updateRoom } = await import('./services/roomService.js');
       const savedRoom = await updateRoom(updatedRoom.id, updatedRoom);
-      setRooms(prev => prev.map(r => r.id === savedRoom.id ? savedRoom : r));
+      setRooms(prev => deduplicateRooms(prev.map(r => r.id === savedRoom.id ? savedRoom : r)));
       setEditRoom(null);
       setNotification({
         message: 'Room updated successfully!',
@@ -358,7 +383,7 @@ function App() {
     } catch (error) {
       console.error('Error updating room:', error);
       // Still update locally even if Firestore fails
-      setRooms(prev => prev.map(r => r.id === updatedRoom.id ? updatedRoom : r));
+      setRooms(prev => deduplicateRooms(prev.map(r => r.id === updatedRoom.id ? updatedRoom : r)));
       setEditRoom(null);
       setNotification({
         message: 'Room updated locally (sync pending)',
@@ -367,6 +392,42 @@ function App() {
       });
     }
   }, []);
+
+  const handleRequestDeleteRoom = useCallback((room) => {
+    setRoomToDelete(room);
+  }, []);
+
+  const handleConfirmDeleteRoom = useCallback(async () => {
+    if (!roomToDelete || isDeleting) return;
+
+    setIsDeleting(true);
+    try {
+      const { deleteRoom } = await import('./services/roomService.js');
+      if (roomToDelete.id) {
+        await deleteRoom(roomToDelete.id);
+      }
+    } catch (error) {
+      console.error('Error deleting room from Firestore (will still remove locally):', error);
+    } finally {
+      setRooms(prev => prev.filter(r =>
+        !(
+          (r.id && roomToDelete.id && r.id === roomToDelete.id) ||
+          (
+            (r.title || '').toString().trim().toLowerCase() === (roomToDelete.title || '').toString().trim().toLowerCase() &&
+            (r.contact || '').toString().trim().toLowerCase() === (roomToDelete.contact || '').toString().trim().toLowerCase() &&
+            (r.gender || '').toString().trim().toLowerCase() === (roomToDelete.gender || '').toString().trim().toLowerCase()
+          )
+        )
+      ));
+      setNotification({
+        message: 'Room deleted successfully',
+        type: 'success',
+        isVisible: true
+      });
+      setIsDeleting(false);
+      setRoomToDelete(null);
+    }
+  }, [roomToDelete, isDeleting]);
 
 
   // Show login screen if not authenticated
@@ -597,6 +658,7 @@ function App() {
                       }}
                       isAdmin={isAdmin}
                       onEdit={() => setEditRoom(room)}
+                      onDelete={() => handleRequestDeleteRoom(room)}
                       t={t}
                     />
                   ))}
@@ -706,6 +768,38 @@ function App() {
           </Suspense>
         )
       }
+
+      {/* In-app delete confirmation popup */}
+      {roomToDelete && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-900 mb-2">
+              Delete Room
+            </h2>
+            <p className="text-sm text-gray-700">
+              Are you sure you want to delete&nbsp;
+              <span className="font-semibold">"{roomToDelete.title}"</span>?
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => !isDeleting && setRoomToDelete(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmDeleteRoom}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 }
