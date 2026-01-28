@@ -59,22 +59,24 @@ const normalizeFeature = (feature) => {
   return lower.replace(/\b\w/g, l => l.toUpperCase());
 };
 
-// Deduplicate rooms by a logical composite key
+// Deduplicate rooms by their unique Firestore document ID only
+// Each room in Firestore has a unique document ID, so we strictly use that
 const deduplicateRooms = (rooms) => {
   const seen = new Set();
   const result = [];
 
   rooms.forEach((room) => {
     if (!room) return;
-    const key = [
-      (room.title || '').toString().trim().toLowerCase(),
-      (room.contact || '').toString().trim().toLowerCase(),
-      (room.gender || '').toString().trim().toLowerCase(),
-      (room.location || '').toString().trim().toLowerCase(),
-    ].join('|');
 
-    if (!seen.has(key)) {
-      seen.add(key);
+    // Only use the unique Firestore document ID for deduplication
+    // This prevents filtering out rooms with similar data
+    if (room.id) {
+      if (!seen.has(room.id)) {
+        seen.add(room.id);
+        result.push(room);
+      }
+    } else {
+      // For rooms without ID (edge case), always include them
       result.push(room);
     }
   });
@@ -121,33 +123,35 @@ function App() {
 
 
 
-  // Load rooms data from Firestore (with fallback to static data)
+  // Load rooms data from Firestore ONLY (no static data fallback to prevent duplicates)
   useEffect(() => {
     const loadRooms = async () => {
       try {
-        // Try Firestore first
-        const { fetchRooms, migrateRoomsToFirestore } = await import('./services/roomService.js');
-        let firestoreRooms = await fetchRooms();
+        // Load rooms exclusively from Firestore
+        const { fetchRooms } = await import('./services/roomService.js');
+        const firestoreRooms = await fetchRooms();
 
-        // If no rooms in Firestore, migrate from static data
-        if (firestoreRooms.length === 0) {
-          console.log('No rooms in Firestore, migrating from static data...');
-          const { sampleRooms } = await import('./data/rooms.js');
-          firestoreRooms = await migrateRoomsToFirestore(sampleRooms);
+        console.log(`📊 Fetched ${firestoreRooms.length} rooms from Firestore`);
+
+        // Set rooms with deduplication (by Firestore ID only)
+        const dedupedRooms = deduplicateRooms(firestoreRooms);
+
+        console.log(`📋 After deduplication: ${dedupedRooms.length} rooms`);
+
+        if (firestoreRooms.length !== dedupedRooms.length) {
+          console.warn(`⚠️ ${firestoreRooms.length - dedupedRooms.length} rooms were filtered out during deduplication`);
         }
 
-        setRooms(deduplicateRooms(firestoreRooms));
+        setRooms(dedupedRooms);
+
+        if (dedupedRooms.length === 0) {
+          console.log('No rooms found in Firestore. Add rooms via the admin panel.');
+        }
       } catch (error) {
-        console.error('Failed to load rooms from Firestore, falling back to static data:', error);
-        // Fallback to static data
-        try {
-          const { getTranslatedRooms } = await import('./data/rooms.js');
-          const translatedRooms = getTranslatedRooms(currentLanguage);
-          setRooms(deduplicateRooms(translatedRooms));
-        } catch (fallbackError) {
-          console.error('Fallback also failed:', fallbackError);
-          setRooms([]);
-        }
+        console.error('Failed to load rooms from Firestore:', error);
+        // Don't fallback to static data - it causes duplicates
+        // Just show empty state and let user know
+        setRooms([]);
       } finally {
         setIsLoadingRooms(false);
       }
@@ -420,16 +424,15 @@ function App() {
     } catch (error) {
       console.error('Error deleting room from Firestore (will still remove locally):', error);
     } finally {
-      setRooms(prev => prev.filter(r =>
-        !(
-          (r.id && roomToDelete.id && r.id === roomToDelete.id) ||
-          (
-            (r.title || '').toString().trim().toLowerCase() === (roomToDelete.title || '').toString().trim().toLowerCase() &&
-            (r.contact || '').toString().trim().toLowerCase() === (roomToDelete.contact || '').toString().trim().toLowerCase() &&
-            (r.gender || '').toString().trim().toLowerCase() === (roomToDelete.gender || '').toString().trim().toLowerCase()
-          )
-        )
-      ));
+      // Only delete by unique Firestore document ID to prevent deleting rooms with similar data
+      setRooms(prev => prev.filter(r => {
+        // Only remove the room with the exact matching ID
+        if (r.id && roomToDelete.id) {
+          return r.id !== roomToDelete.id;
+        }
+        // If somehow a room has no ID, don't delete it
+        return true;
+      }));
       setNotification({
         message: 'The room has been removed from the listings.',
         type: 'success',
@@ -441,6 +444,88 @@ function App() {
     }
   }, [roomToDelete, isDeleting]);
 
+  // Handler to cleanup duplicate rooms from Firestore (Admin only)
+  const handleCleanupDuplicates = useCallback(async () => {
+    if (!isAdmin) return;
+
+    try {
+      setNotification({
+        message: 'Scanning for duplicate rooms...',
+        type: 'info',
+        isVisible: true,
+        title: 'Cleaning Up'
+      });
+
+      const { cleanupDuplicateRooms } = await import('./utils/cleanupDuplicates.js');
+      const result = await cleanupDuplicateRooms();
+
+      if (result.duplicatesRemoved > 0) {
+        // Reload rooms after cleanup
+        const { fetchRooms } = await import('./services/roomService.js');
+        const freshRooms = await fetchRooms();
+        setRooms(deduplicateRooms(freshRooms));
+
+        setNotification({
+          message: `Removed ${result.duplicatesRemoved} duplicate rooms. ${result.remainingRooms} rooms remaining.`,
+          type: 'success',
+          isVisible: true,
+          title: 'Cleanup Complete!'
+        });
+      } else {
+        setNotification({
+          message: 'No duplicate rooms found. Your listings are clean!',
+          type: 'success',
+          isVisible: true,
+          title: 'All Good!'
+        });
+      }
+    } catch (error) {
+      console.error('Error cleaning up duplicates:', error);
+      setNotification({
+        message: 'Failed to cleanup duplicates. Check console for details.',
+        type: 'error',
+        isVisible: true,
+        title: 'Cleanup Failed'
+      });
+    }
+  }, [isAdmin]);
+
+  // Handler to debug rooms - list all rooms by owner (Admin only)
+  const handleDebugRooms = useCallback(async () => {
+    if (!isAdmin) return;
+
+    try {
+      setNotification({
+        message: 'Check browser console (F12) for room details...',
+        type: 'info',
+        isVisible: true,
+        title: 'Debugging Rooms'
+      });
+
+      const { listRoomsByOwner, getAllRoomsDebug } = await import('./utils/cleanupDuplicates.js');
+
+      console.log('\n========== FIRESTORE ROOMS DEBUG ==========\n');
+      const result = await listRoomsByOwner();
+      console.log('\n');
+      await getAllRoomsDebug();
+      console.log('\n============================================\n');
+
+      setNotification({
+        message: `Found ${result.totalRooms} rooms from ${result.totalOwners} owners. ${result.ownersWithMultiple.length} owners have multiple properties. Check console for details.`,
+        type: 'success',
+        isVisible: true,
+        title: 'Debug Complete'
+      });
+    } catch (error) {
+      console.error('Error debugging rooms:', error);
+      setNotification({
+        message: 'Failed to debug rooms. Check console for details.',
+        type: 'error',
+        isVisible: true,
+        title: 'Debug Failed'
+      });
+    }
+  }, [isAdmin]);
 
   // Show login screen if not authenticated
   if (!isAuthenticated) {
@@ -525,6 +610,28 @@ function App() {
                 <Filter className="w-4 h-4 mr-2" />
                 Filters
               </Button>
+              {isAdmin && (
+                <Button
+                  onClick={handleCleanupDuplicates}
+                  variant="outline"
+                  size="sm"
+                  className="bg-red-50 border-red-200 text-red-600 hover:bg-red-100 whitespace-nowrap text-xs"
+                  title="Remove duplicate rooms from Firestore"
+                >
+                  🧹 Clean
+                </Button>
+              )}
+              {isAdmin && (
+                <Button
+                  onClick={handleDebugRooms}
+                  variant="outline"
+                  size="sm"
+                  className="bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100 whitespace-nowrap text-xs"
+                  title="Debug: List all rooms in Firestore"
+                >
+                  🔍 Debug
+                </Button>
+              )}
               <Button
                 onClick={handleShowAddForm}
                 size="sm"
