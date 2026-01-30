@@ -315,6 +315,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
       images: formData.images.length > 0 ? formData.images : ['/api/placeholder/400/300'],
       billInclusion: formData.billInclusion,
       selectedConditions: formData.selectedConditions,
+      hidden: isEdit && initialRoom ? (initialRoom.hidden || false) : false,
       ...(adv != null && !isNaN(adv) ? { advance: adv } : {}),
       ...(dep != null && !isNaN(dep) ? { deposit: dep } : {})
     };

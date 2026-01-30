@@ -1,10 +1,10 @@
 import React, { useState, useCallback, memo } from 'react';
-import { MapPin, Phone, ExternalLink, Heart, Star, ChevronLeft, ChevronRight, X as XIcon, Calendar } from 'lucide-react';
+import { MapPin, Phone, ExternalLink, Heart, Star, ChevronLeft, ChevronRight, X as XIcon, Calendar, EyeOff, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 
-const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst, onBookNow }) => {
+const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst, onBookNow, onToggleHidden }) => {
   const { t } = useLanguage();
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImageIdx, setModalImageIdx] = useState(0);
@@ -58,8 +58,21 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst
 
   const primaryImage = room.images && room.images.length > 0 ? getSafeImageUrl(room.images[0]) : null;
 
+  const handleToggleHidden = useCallback(() => {
+    if (onToggleHidden) {
+      onToggleHidden();
+    }
+  }, [onToggleHidden]);
+
   return (
-    <div className="room-card p-4 hover-lift h-full flex flex-col">
+    <div className={`room-card p-3 sm:p-4 hover-lift h-full flex flex-col ${room.hidden ? 'opacity-60 border-2 border-dashed border-gray-400' : ''}`}>
+      {/* Hidden Badge for Admin */}
+      {room.hidden && isAdmin && (
+        <div className="absolute top-2 left-2 z-10 bg-gray-800/90 backdrop-blur-sm text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
+          <EyeOff className="w-3 h-3" />
+          <span className="hidden xs:inline">Hidden</span>
+        </div>
+      )}
       {/* Image Section (only first image visible) */}
       <div className="relative mb-4 overflow-hidden rounded-xl flex-shrink-0">
         <div className="w-full h-48 md:h-56 lg:h-64 bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center">
@@ -209,22 +222,33 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst
 
         {/* Admin Actions */}
         {isAdmin && (
-          <div className="flex flex-col gap-2 mt-2">
+          <div className="flex flex-col gap-1.5 sm:gap-2 mt-2">
             <Button
-              onClick={handleEdit}
-              className="btn-secondary w-full flex items-center justify-center gap-2"
-              size="sm"
-            >
-              {t('update')}
-            </Button>
-            <Button
-              onClick={onDelete}
+              onClick={handleToggleHidden}
               variant="outline"
-              className="w-full flex items-center justify-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
+              className={`w-full flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10 touch-manipulation active:scale-[0.98] transition-transform ${room.hidden ? 'bg-green-50 border-green-300 text-green-700 hover:bg-green-100 active:bg-green-200' : 'bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100 active:bg-yellow-200'}`}
               size="sm"
             >
-              Delete
+              {room.hidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              {room.hidden ? 'Unhide' : 'Hide'}
             </Button>
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+              <Button
+                onClick={handleEdit}
+                className="btn-secondary flex items-center justify-center gap-1 text-xs sm:text-sm h-9 sm:h-10 touch-manipulation active:scale-[0.98] transition-transform"
+                size="sm"
+              >
+                {t('update')}
+              </Button>
+              <Button
+                onClick={onDelete}
+                variant="outline"
+                className="flex items-center justify-center gap-1 text-xs sm:text-sm h-9 sm:h-10 border-red-300 text-red-700 hover:bg-red-50 active:bg-red-100 touch-manipulation active:scale-[0.98] transition-transform"
+                size="sm"
+              >
+                Delete
+              </Button>
+            </div>
           </div>
         )}
       </div>

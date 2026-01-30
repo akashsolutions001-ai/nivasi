@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/slider.jsx';
 import RoomCard from './components/RoomCard.jsx';
 import InAppToast from './components/InAppToast.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
+import ConfirmationModal from './components/ConfirmationModal.jsx';
 
 import { useLanguage } from './contexts/LanguageContext.jsx';
 import { useAuth } from './contexts/AuthContext.jsx';
@@ -108,6 +109,7 @@ function App() {
   const [messItems, setMessItems] = useState([]);
   const [roomToDelete, setRoomToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [roomToToggleHidden, setRoomToToggleHidden] = useState(null);
 
   // iOS Debug logging
   useEffect(() => {
@@ -123,35 +125,58 @@ function App() {
 
 
 
-  // Load rooms data from Firestore ONLY (no static data fallback to prevent duplicates)
+  // Load rooms data from Firestore AND static data (merged, avoiding duplicates)
   useEffect(() => {
     const loadRooms = async () => {
       try {
-        // Load rooms exclusively from Firestore
+        // Load rooms from Firestore
         const { fetchRooms } = await import('./services/roomService.js');
         const firestoreRooms = await fetchRooms();
 
         console.log(`📊 Fetched ${firestoreRooms.length} rooms from Firestore`);
 
-        // Set rooms with deduplication (by Firestore ID only)
-        const dedupedRooms = deduplicateRooms(firestoreRooms);
+        // Also load static rooms
+        const { sampleRooms } = await import('./data/rooms.js');
+        console.log(`📦 Loaded ${sampleRooms.length} static rooms from rooms.js`);
 
-        console.log(`📋 After deduplication: ${dedupedRooms.length} rooms`);
+        // Create a Set of unique identifiers from Firestore rooms to avoid duplicates
+        // Use title + contact + rent as a composite key
+        const firestoreKeys = new Set(
+          firestoreRooms.map(r => `${(r.title || '').toLowerCase().trim()}|${(r.contact || '').trim()}|${r.rent}`)
+        );
 
-        if (firestoreRooms.length !== dedupedRooms.length) {
-          console.warn(`⚠️ ${firestoreRooms.length - dedupedRooms.length} rooms were filtered out during deduplication`);
-        }
+        // Filter static rooms that don't already exist in Firestore
+        const newStaticRooms = sampleRooms.filter(room => {
+          const key = `${(room.title || '').toLowerCase().trim()}|${(room.contact || '').trim()}|${room.rent}`;
+          return !firestoreKeys.has(key);
+        });
+
+        console.log(`🆕 ${newStaticRooms.length} static rooms not in Firestore`);
+
+        // Merge: Firestore rooms take priority, then add non-duplicate static rooms
+        const allRooms = [...firestoreRooms, ...newStaticRooms];
+
+        // Final deduplication by ID
+        const dedupedRooms = deduplicateRooms(allRooms);
+
+        console.log(`📋 Final room count: ${dedupedRooms.length} rooms`);
 
         setRooms(dedupedRooms);
 
         if (dedupedRooms.length === 0) {
-          console.log('No rooms found in Firestore. Add rooms via the admin panel.');
+          console.log('No rooms found. Add rooms via the admin panel.');
         }
       } catch (error) {
-        console.error('Failed to load rooms from Firestore:', error);
-        // Don't fallback to static data - it causes duplicates
-        // Just show empty state and let user know
-        setRooms([]);
+        console.error('Failed to load rooms:', error);
+        // Fallback to static data only if Firestore fails
+        try {
+          const { sampleRooms } = await import('./data/rooms.js');
+          console.log(`📦 Fallback: Loaded ${sampleRooms.length} static rooms`);
+          setRooms(sampleRooms);
+        } catch (staticError) {
+          console.error('Failed to load static rooms:', staticError);
+          setRooms([]);
+        }
       } finally {
         setIsLoadingRooms(false);
       }
@@ -294,6 +319,11 @@ function App() {
   // Enhanced filtering with memoization
   const filteredRooms = useMemo(() => {
     return rooms.filter(room => {
+      // Hide hidden rooms from non-admin users
+      if (room.hidden && !isAdmin) {
+        return false;
+      }
+
       // Gender filtering - only show rooms matching the selected gender
       let matchesGender = true;
       if (selectedGender) {
@@ -323,7 +353,7 @@ function App() {
 
       return matchesGender && matchesCategory && matchesSearch && matchesFeatures && matchesPrice;
     });
-  }, [rooms, selectedGender, category, search, featureFilters, roomMatchesCategory, maxPrice]);
+  }, [rooms, selectedGender, category, search, featureFilters, roomMatchesCategory, maxPrice, isAdmin]);
 
   const handleShowAddForm = useCallback(() => {
     if (isAdmin) {
@@ -444,6 +474,48 @@ function App() {
     }
   }, [roomToDelete, isDeleting]);
 
+  // Handler to request toggle room visibility (opens confirmation modal)
+  const handleRequestToggleHidden = useCallback((room) => {
+    setRoomToToggleHidden(room);
+  }, []);
+
+  // Handler to confirm toggle room visibility (Admin only)
+  const handleConfirmToggleHidden = useCallback(async () => {
+    if (!isAdmin || !roomToToggleHidden) return;
+
+    const room = roomToToggleHidden;
+
+    try {
+      const { updateRoom } = await import('./services/roomService.js');
+      const updatedRoom = { ...room, hidden: !room.hidden };
+      await updateRoom(room.id, updatedRoom);
+
+      setRooms(prev => prev.map(r => r.id === room.id ? updatedRoom : r));
+
+      setNotification({
+        message: room.hidden
+          ? 'Room is now visible to all users.'
+          : 'Room is now hidden from users (only visible to admin).',
+        type: 'success',
+        isVisible: true,
+        title: room.hidden ? 'Room Unhidden!' : 'Room Hidden!'
+      });
+    } catch (error) {
+      console.error('Error toggling room visibility:', error);
+      // Still update locally even if Firestore fails
+      const updatedRoom = { ...room, hidden: !room.hidden };
+      setRooms(prev => prev.map(r => r.id === room.id ? updatedRoom : r));
+      setNotification({
+        message: 'Visibility changed locally. Will sync when connection is restored.',
+        type: 'warning',
+        isVisible: true,
+        title: 'Updated Locally'
+      });
+    } finally {
+      setRoomToToggleHidden(null);
+    }
+  }, [isAdmin, roomToToggleHidden]);
+
   // Handler to cleanup duplicate rooms from Firestore (Admin only)
   const handleCleanupDuplicates = useCallback(async () => {
     if (!isAdmin) return;
@@ -523,6 +595,100 @@ function App() {
         type: 'error',
         isVisible: true,
         title: 'Debug Failed'
+      });
+    }
+  }, [isAdmin]);
+
+  // Handler to migrate static rooms to Firestore (Admin only)
+  const handleMigrateToFirestore = useCallback(async () => {
+    if (!isAdmin) return;
+
+    try {
+      setNotification({
+        message: 'Migrating static rooms to Firestore...',
+        type: 'info',
+        isVisible: true,
+        title: 'Migration Started'
+      });
+
+      // Load static rooms
+      const { sampleRooms } = await import('./data/rooms.js');
+      const { fetchRooms, addRoom } = await import('./services/roomService.js');
+
+      // Get existing rooms from Firestore
+      const existingRooms = await fetchRooms();
+
+      // Create a Set of unique identifiers from existing Firestore rooms
+      const existingKeys = new Set(
+        existingRooms.map(r => `${(r.title || '').toLowerCase().trim()}|${(r.contact || '').trim()}|${r.rent}`)
+      );
+
+      // Filter static rooms that don't already exist in Firestore
+      const roomsToMigrate = sampleRooms.filter(room => {
+        const key = `${(room.title || '').toLowerCase().trim()}|${(room.contact || '').trim()}|${room.rent}`;
+        return !existingKeys.has(key);
+      });
+
+      console.log(`📦 Found ${roomsToMigrate.length} rooms to migrate out of ${sampleRooms.length} static rooms`);
+
+      if (roomsToMigrate.length === 0) {
+        setNotification({
+          message: 'All static rooms are already in Firestore!',
+          type: 'success',
+          isVisible: true,
+          title: 'Already Migrated'
+        });
+        return;
+      }
+
+      // Migrate rooms one by one
+      let migrated = 0;
+      let failed = 0;
+
+      for (const room of roomsToMigrate) {
+        try {
+          // Remove the local numeric ID so Firestore generates a new one
+          const roomData = { ...room };
+          delete roomData.id;
+
+          await addRoom(roomData);
+          migrated++;
+          console.log(`✅ Migrated: ${room.title}`);
+        } catch (err) {
+          failed++;
+          console.error(`❌ Failed to migrate: ${room.title}`, err);
+        }
+      }
+
+      // Reload rooms after migration
+      const freshRooms = await fetchRooms();
+      const { sampleRooms: latestStaticRooms } = await import('./data/rooms.js');
+
+      // Merge with remaining static rooms (in case some weren't migrated)
+      const firestoreKeys = new Set(
+        freshRooms.map(r => `${(r.title || '').toLowerCase().trim()}|${(r.contact || '').trim()}|${r.rent}`)
+      );
+      const remainingStatic = latestStaticRooms.filter(room => {
+        const key = `${(room.title || '').toLowerCase().trim()}|${(room.contact || '').trim()}|${room.rent}`;
+        return !firestoreKeys.has(key);
+      });
+
+      setRooms(deduplicateRooms([...freshRooms, ...remainingStatic]));
+
+      setNotification({
+        message: `Successfully migrated ${migrated} rooms to Firestore.${failed > 0 ? ` ${failed} failed.` : ''}`,
+        type: failed > 0 ? 'warning' : 'success',
+        isVisible: true,
+        title: 'Migration Complete!'
+      });
+
+    } catch (error) {
+      console.error('Error migrating rooms:', error);
+      setNotification({
+        message: 'Failed to migrate rooms. Check console for details.',
+        type: 'error',
+        isVisible: true,
+        title: 'Migration Failed'
       });
     }
   }, [isAdmin]);
@@ -610,28 +776,6 @@ function App() {
                 <Filter className="w-4 h-4 mr-2" />
                 Filters
               </Button>
-              {isAdmin && (
-                <Button
-                  onClick={handleCleanupDuplicates}
-                  variant="outline"
-                  size="sm"
-                  className="bg-red-50 border-red-200 text-red-600 hover:bg-red-100 whitespace-nowrap text-xs"
-                  title="Remove duplicate rooms from Firestore"
-                >
-                  🧹 Clean
-                </Button>
-              )}
-              {isAdmin && (
-                <Button
-                  onClick={handleDebugRooms}
-                  variant="outline"
-                  size="sm"
-                  className="bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100 whitespace-nowrap text-xs"
-                  title="Debug: List all rooms in Firestore"
-                >
-                  🔍 Debug
-                </Button>
-              )}
               <Button
                 onClick={handleShowAddForm}
                 size="sm"
@@ -780,6 +924,7 @@ function App() {
                       isAdmin={isAdmin}
                       onEdit={() => setEditRoom(room)}
                       onDelete={() => handleRequestDeleteRoom(room)}
+                      onToggleHidden={() => handleRequestToggleHidden(room)}
                       t={t}
                     />
                   ))}
@@ -921,6 +1066,21 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Hide/Unhide confirmation popup */}
+      <ConfirmationModal
+        isOpen={!!roomToToggleHidden}
+        onClose={() => setRoomToToggleHidden(null)}
+        onConfirm={handleConfirmToggleHidden}
+        title={roomToToggleHidden?.hidden ? 'Unhide Room?' : 'Hide Room?'}
+        message={roomToToggleHidden?.hidden
+          ? `Are you sure you want to unhide "${roomToToggleHidden?.title}"? This room will become visible to all users.`
+          : `Are you sure you want to hide "${roomToToggleHidden?.title}"? This room will only be visible to admins.`
+        }
+        confirmText={roomToToggleHidden?.hidden ? 'Yes, Unhide' : 'Yes, Hide'}
+        cancelText="Cancel"
+        type={roomToToggleHidden?.hidden ? 'success' : 'warning'}
+      />
     </div >
   );
 }
