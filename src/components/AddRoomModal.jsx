@@ -87,6 +87,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
     selectedFeatures: initialRoom.features || [],
     gender: initialRoom.gender || 'boy',
     images: initialRoom.images || [],
+    imagePaths: Array.isArray(initialRoom.images) ? initialRoom.images.join('\n') : '',
     billInclusion: initialRoom.billInclusion || 'lightAndWater',
     roomType: initialRoom.roomType || initialRoom.rooms || '1 RK',
     pricingType: initialRoom.pricingType || 'perStudent',
@@ -107,6 +108,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
     selectedFeatures: [],
     gender: 'boy',
     images: [],
+    imagePaths: '',
     billInclusion: 'lightAndWater',
     roomType: '1 RK',
     pricingType: 'perStudent',
@@ -161,21 +163,21 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
     });
   };
 
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    const imageUrls = files.map(file => URL.createObjectURL(file));
-
+  const handleImagePathsChange = (e) => {
+    const value = e.target.value;
+    const paths = value
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean);
     setFormData(prev => ({
       ...prev,
-      images: [...prev.images, ...imageUrls]
+      imagePaths: value,
+      images: paths
     }));
-  };
 
-  const removeImage = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }));
+    if (errors.images && paths.length > 0) {
+      setErrors(prev => ({ ...prev, images: '' }));
+    }
   };
 
   const handleFetchMyLocation = () => {
@@ -752,18 +754,26 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
               )}
             </div>
 
-            {/* Image Upload */}
+            {/* Images from /public (paths) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Upload className="w-4 h-4 inline mr-1" />
                 {t('images')} *
               </label>
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <p className="text-xs text-gray-500 mb-1">
+                Enter image paths from the <code>/public</code> folder, one per line. Example:
+                <br />
+                <span className="font-mono text-[11px]">
+                  /Sureh Pattar/upper/front.avif
+                </span>
+              </p>
+              <textarea
+                name="imagePaths"
+                value={formData.imagePaths}
+                onChange={handleImagePathsChange}
+                placeholder="/Owner Name/folder/image-1.avif&#10;/Owner Name/folder/image-2.avif"
+                rows="3"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
               />
               {errors.images && (
                 <p className="text-red-500 text-sm mt-1">{errors.images}</p>
@@ -779,13 +789,6 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
                         alt={`Preview ${index + 1}`}
                         className="w-full h-24 object-cover rounded-md"
                       />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
                     </div>
                   ))}
                 </div>
