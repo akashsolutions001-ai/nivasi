@@ -55,7 +55,7 @@ export default defineConfig(({ mode }) => {
   },
   // Optimize dependencies
   optimizeDeps: {
-    include: ['react', 'react-dom', 'lucide-react']
+    include: ['react', 'react-dom', 'lucide-react', 'exceljs']
   },
   // Proxy /api to deployed backend so local `npm run dev` can reach Vercel functions
   server: {

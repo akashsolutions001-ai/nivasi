@@ -8,6 +8,7 @@ import InAppToast from './components/InAppToast.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
 import ConfirmationModal from './components/ConfirmationModal.jsx';
 import AdminMetrics from './components/AdminMetrics.jsx';
+import AdminExportDropdown from './components/AdminExportDropdown.jsx';
 
 import { useLanguage } from './contexts/LanguageContext.jsx';
 import { useAuth } from './contexts/AuthContext.jsx';
@@ -526,6 +527,17 @@ function App() {
       return matchesGender && matchesLocation && matchesStream && matchesCategory && matchesSearch && matchesFeatures && matchesPrice;
     });
   }, [rooms, selectedGender, selectedStudentStream, selectedLocation, category, search, featureFilters, roomMatchesCategory, maxPrice, isAdmin, isGlobalAdmin, adminScope, adminFilter]);
+
+  // College / Admin Scope rooms for comprehensive export
+  const scopeRooms = useMemo(() => {
+    if (isAdmin && !isGlobalAdmin && adminScope) {
+      return rooms.filter((room) => roomMatchesUserLocation(room, adminScope));
+    }
+    if (selectedLocation?.college) {
+      return rooms.filter((room) => roomMatchesUserLocation(room, selectedLocation));
+    }
+    return rooms;
+  }, [rooms, isAdmin, isGlobalAdmin, adminScope, selectedLocation]);
 
   // AuthGuard Interceptor
   const requireAuth = useCallback((actionStr, callback) => {
@@ -1100,20 +1112,32 @@ function App() {
             </div>
 
             {/* Actions - Row 2 on Mobile */}
-            <div className="grid grid-cols-2 gap-2 w-full md:w-auto md:flex md:gap-2">
+            <div className="flex flex-wrap md:flex-nowrap gap-2 w-full md:w-auto items-center justify-between md:justify-end">
               <Button
                 onClick={() => setShowFeatureFilter(true)}
                 variant="outline"
                 size="sm"
-                className={`w-full md:w-auto flex justify-center items-center min-h-[44px] md:min-h-0 text-sm px-3 bg-white lg:hidden ${Object.keys(featureFilters).length > 0 || maxPrice < 100000 ? 'border-orange-500 text-orange-600' : ''}`}
+                className={`flex-1 md:flex-none flex justify-center items-center min-h-[44px] md:min-h-0 text-sm px-3 bg-white lg:hidden ${Object.keys(featureFilters).length > 0 || maxPrice < 100000 ? 'border-orange-500 text-orange-600' : ''}`}
               >
                 <Filter className="w-4 h-4 mr-2 shrink-0" />
                 <span className="whitespace-nowrap">Filters</span>
               </Button>
+
+              <AdminExportDropdown
+                scopeRooms={scopeRooms}
+                filteredRooms={filteredRooms}
+                collegeName={(!isGlobalAdmin && adminScope?.college) ? adminScope.college : (selectedLocation?.college || '')}
+                cityName={(!isGlobalAdmin && adminScope?.city) ? adminScope.city : (selectedLocation?.city || '')}
+                messItems={messItems}
+                isAdmin={isAdmin}
+                onRequireAdmin={() => setShowAdminLogin(true)}
+                setNotification={setNotification}
+              />
+
               <Button
                 onClick={handleShowAddForm}
                 size="sm"
-                className="w-full md:w-auto min-h-[44px] md:min-h-0 px-4 bg-orange-600 hover:bg-orange-700 text-white whitespace-nowrap text-sm"
+                className="flex-1 md:flex-none min-h-[44px] md:min-h-0 px-4 bg-orange-600 hover:bg-orange-700 text-white whitespace-nowrap text-sm"
               >
                 <span className="hidden sm:inline">+ {t('addRoom')}</span>
                 <span className="sm:hidden">+ Add Room</span>
@@ -1286,9 +1310,9 @@ function App() {
                 </div>
               ) : filteredRooms.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-                  {filteredRooms.map((room) => (
+                  {filteredRooms.map((room, index) => (
                     <RoomCard
-                      key={room.id}
+                      key={`${room.id}-${index}`}
                       room={room}
                       onViewDetails={() => setSelectedRoom(room)}
                       onBookNow={() => {

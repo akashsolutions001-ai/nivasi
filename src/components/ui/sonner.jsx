@@ -1,10 +1,11 @@
-import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner";
 
 const Toaster = ({
   ...props
 }) => {
-  const { theme = "system" } = useTheme()
+  // This project uses Vite (not Next.js), so next-themes is not compatible.
+  // Default to "light" theme for the toaster.
+  const theme = "light";
 
   return (
     <Sonner
