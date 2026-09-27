@@ -1123,16 +1123,18 @@ function App() {
                 <span className="whitespace-nowrap">Filters</span>
               </Button>
 
-              <AdminExportDropdown
-                scopeRooms={scopeRooms}
-                filteredRooms={filteredRooms}
-                collegeName={(!isGlobalAdmin && adminScope?.college) ? adminScope.college : (selectedLocation?.college || '')}
-                cityName={(!isGlobalAdmin && adminScope?.city) ? adminScope.city : (selectedLocation?.city || '')}
-                messItems={messItems}
-                isAdmin={isAdmin}
-                onRequireAdmin={() => setShowAdminLogin(true)}
-                setNotification={setNotification}
-              />
+              {isAdmin && (
+                <AdminExportDropdown
+                  scopeRooms={scopeRooms}
+                  filteredRooms={filteredRooms}
+                  collegeName={(!isGlobalAdmin && adminScope?.college) ? adminScope.college : (selectedLocation?.college || '')}
+                  cityName={(!isGlobalAdmin && adminScope?.city) ? adminScope.city : (selectedLocation?.city || '')}
+                  messItems={messItems}
+                  isAdmin={isAdmin}
+                  onRequireAdmin={() => setShowAdminLogin(true)}
+                  setNotification={setNotification}
+                />
+              )}
 
               <Button
                 onClick={handleShowAddForm}

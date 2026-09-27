@@ -40,7 +40,12 @@ export default function AdminExportDropdown({
     };
   }, [isOpen]);
 
+  if (!isAdmin) {
+    return null;
+  }
+
   const hasFilterActive = filteredRooms.length > 0 && filteredRooms.length !== scopeRooms.length;
+
 
   const handleToggle = () => {
     if (!isAdmin && onRequireAdmin) {
