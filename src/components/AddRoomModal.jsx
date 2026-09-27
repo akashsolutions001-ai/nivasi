@@ -1,14 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   X,
-  Upload,
   MapPin,
   Phone,
   DollarSign,
   FileText,
   Check,
   AlertCircle,
-  Trash2,
   Locate,
   CreditCard,
   Banknote,
@@ -18,6 +16,8 @@ import { Button } from '@/components/ui/button.jsx';
 import { Checkbox } from '@/components/ui/checkbox.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import ConfirmationModal from './ConfirmationModal.jsx';
+import CloudinaryImageUploader from './CloudinaryImageUploader.jsx';
+import { getImageUrl } from '../utils/cloudinaryUpload.js';
 import { SUBSCRIPTION_DURATION_DAYS, MAX_ROOMS_PER_BATCH, getSubscriptionAmount, getSubscriptionTotal, getRoomTypeOptions } from '../utils/subscriptionConfig.js';
 import { setAddRoomPaymentFlow } from '../utils/paymentFlow.js';
 import { initiatePayment } from '../services/paymentService.js';
@@ -106,9 +106,9 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     description: initialRoom.description || '',
     selectedFeatures: initialRoom.features || [],
     gender: initialRoom.gender || 'boy',
-    images: initialRoom.images || [],
-    imagePaths: Array.isArray(initialRoom.images) ? initialRoom.images.join('\n') : '',
+    images: Array.isArray(initialRoom.images) ? initialRoom.images.filter(img => Boolean(getImageUrl(img))) : [],
     billInclusion: initialRoom.billInclusion || 'lightAndWater',
+
     roomType: initialRoom.roomType || initialRoom.rooms || '1 RK',
     roomCount: '1',
     pricingType: initialRoom.pricingType || 'perStudent',
@@ -130,7 +130,6 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     selectedFeatures: [],
     gender: 'boy',
     images: [],
-    imagePaths: '',
     billInclusion: 'lightAndWater',
     roomType: '1 RK',
     roomCount: '1',
@@ -210,19 +209,9 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     });
   };
 
-  const handleImagePathsChange = (e) => {
-    const value = e.target.value;
-    const paths = value
-      .split('\n')
-      .map(line => line.trim())
-      .filter(Boolean);
-    setFormData(prev => ({
-      ...prev,
-      imagePaths: value,
-      images: paths
-    }));
-
-    if (errors.images && paths.length > 0) {
+  const handleImagesChange = (newImages) => {
+    setFormData(prev => ({ ...prev, images: newImages }));
+    if (errors.images && newImages.length > 0) {
       setErrors(prev => ({ ...prev, images: '' }));
     }
   };
@@ -308,8 +297,9 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       newErrors.gender = t('genderRequired');
     }
 
-    if (isAdmin && formData.images.length === 0) {
-      newErrors.images = t('imagesRequired');
+    // Both admins and owners must upload at least one image
+    if (formData.images.length === 0) {
+      newErrors.images = t('imagesRequired') || 'At least one room image is required.';
     }
 
     setErrors(newErrors);
@@ -405,7 +395,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       description: description || '',
       features: formData.selectedFeatures,
       gender: formData.gender,
-      images: formData.images.length > 0 ? formData.images : ['/api/placeholder/400/300'],
+      images: formData.images.length > 0 ? formData.images : [],
       billInclusion: formData.billInclusion,
       selectedConditions: formData.selectedConditions,
       hidden: isEdit && initialRoom ? (initialRoom.hidden || false) : false,
@@ -1165,65 +1155,17 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
               )}
             </div>
 
-            {/* Images - Conditional rendering based on admin status */}
+            {/* Images — Cloudinary direct upload for both admins and owners */}
             <div data-field="images">
-              {isAdmin ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <Upload className="w-4 h-4 inline mr-1" />
-                    {t('images')} *
-                  </label>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Enter image paths from the <code>/public</code> folder, one per line. Example:
-                    <br />
-                    <span className="font-mono text-[11px]">
-                      /Sureh Pattar/upper/front.avif
-                    </span>
-                  </p>
-                  <textarea
-                    name="imagePaths"
-                    value={formData.imagePaths}
-                    onChange={handleImagePathsChange}
-                    placeholder="/Owner Name/folder/image-1.avif&#10;/Owner Name/folder/image-2.avif"
-                    rows="3"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
-                  />
-                  {errors.images && (
-                    <p className="text-red-500 text-sm mt-1">{errors.images}</p>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-orange-800 mb-2 flex items-center">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Room Images
-                  </h4>
-                  <p className="text-sm text-orange-700 mb-2">
-                    To add images to your room listing, please send them to our WhatsApp number: <strong>+91 8999483116</strong>. Make sure to mention your room name or registered phone number.
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={() => window.open('https://wa.me/918999483116', '_blank')}
-                    className="mt-2"
-                  >
-                    Send Images via WhatsApp
-                  </Button>
-                </div>
-              )}
-
-              {/* Image Preview */}
-              {formData.images.length > 0 && (
-                <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {formData.images.map((image, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={image}
-                        alt={`Preview ${index + 1}`}
-                        className="w-full h-24 object-cover rounded-md"
-                      />
-                    </div>
-                  ))}
-                </div>
+              <CloudinaryImageUploader
+                existingImages={formData.images}
+                onChange={handleImagesChange}
+                disabled={isSubmitting}
+                label="Room Images"
+                required={true}
+              />
+              {errors.images && (
+                <p className="text-red-500 text-sm mt-1">{errors.images}</p>
               )}
             </div>
           </div>

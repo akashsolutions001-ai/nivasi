@@ -1,14 +1,20 @@
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import { MapPin, Phone, ExternalLink, Heart, Star, ChevronLeft, ChevronRight, X as XIcon, Calendar, EyeOff, Eye, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import { isSubscriptionActive, isExpiringSoon, getDaysUntilExpiry } from '../utils/subscriptionConfig.js';
+import { getImageUrl, getOptimizedImageUrl } from '../utils/cloudinaryUpload.js';
 
 const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete, isFirst, onBookNow, onToggleHidden, onRenew, onVerify, onReject, isGlobalAdmin, onApproveDelete, onRejectDelete }) => {
   const { t } = useLanguage();
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImageIdx, setModalImageIdx] = useState(0);
+
+  const validImages = useMemo(() => {
+    if (!Array.isArray(room?.images)) return [];
+    return room.images.filter((img) => Boolean(getImageUrl(img)));
+  }, [room?.images]);
 
   const hasSubscription = room.subscriptionStatus !== undefined;
   const getFormattedDate = (timestamp) => {
@@ -42,13 +48,15 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
 
   const handlePrevImage = useCallback((e) => {
     e.stopPropagation();
-    setModalImageIdx((prev) => (prev === 0 ? room.images.length - 1 : prev - 1));
-  }, [room.images.length]);
+    if (validImages.length === 0) return;
+    setModalImageIdx((prev) => (prev === 0 ? validImages.length - 1 : prev - 1));
+  }, [validImages.length]);
 
   const handleNextImage = useCallback((e) => {
     e.stopPropagation();
-    setModalImageIdx((prev) => (prev === room.images.length - 1 ? 0 : prev + 1));
-  }, [room.images.length]);
+    if (validImages.length === 0) return;
+    setModalImageIdx((prev) => (prev === validImages.length - 1 ? 0 : prev + 1));
+  }, [validImages.length]);
 
   const handleViewDetails = useCallback(() => {
     onViewDetails(room);
@@ -64,13 +72,19 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
     }
   }, [onBookNow, room]);
 
-  // Safely normalize image URLs so they work in src attributes.
-  // - Encodes spaces so paths like "/Ayan Mulla/..." work
-  // - Leaves blob: URLs (used for newly added rooms) untouched
-  const getSafeImageUrl = useCallback((url) => {
-    if (!url || typeof url !== 'string') return null;
-    if (url.startsWith('blob:')) return url;
-    // Encode only spaces to avoid breaking already-encoded URLs
+  const [imageError, setImageError] = useState(false);
+
+  // Normalize image values: handles Cloudinary objects AND legacy URL strings.
+  const getSafeImageUrl = useCallback((image) => {
+    const url = getImageUrl(image);
+    if (!url) return null;
+    return url.replace(/ /g, '%20');
+  }, []);
+
+  // For card thumbnails use a Cloudinary optimized/resized URL (400px wide)
+  const getCardImageUrl = useCallback((image) => {
+    const url = getOptimizedImageUrl(image, 400);
+    if (!url) return null;
     return url.replace(/ /g, '%20');
   }, []);
 
@@ -80,7 +94,7 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
       room.paymentStatus === 'expired' ||
       (room.paymentStatus === 'paid' && !isSubscriptionActive(room.subscriptionEnd)));
 
-  const primaryImage = room.images && room.images.length > 0 ? getSafeImageUrl(room.images[0]) : null;
+  const primaryImage = validImages.length > 0 ? getCardImageUrl(validImages[0]) : null;
 
   const handleToggleHidden = useCallback(() => {
     if (onToggleHidden) {
@@ -129,7 +143,7 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
       {/* Image Section (only first image visible) */}
       <div className="relative mb-4 overflow-hidden rounded-xl flex-shrink-0 mt-2">
         <div className="w-full h-48 md:h-56 lg:h-64 bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center">
-          {primaryImage ? (
+          {primaryImage && !imageError ? (
             <div className="h-full w-full flex-shrink-0 cursor-pointer" onClick={handleViewDetails}>
               <img
                 src={primaryImage}
@@ -137,9 +151,7 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
                 className="h-44 md:h-52 lg:h-60 w-full object-cover rounded-lg border border-orange-100 hover:scale-105 transition-transform"
                 loading={isFirst ? "eager" : 'lazy'}
                 decoding="sync"
-                onError={e => {
-                  e.target.style.display = 'none';
-                }}
+                onError={() => setImageError(true)}
               />
             </div>
           ) : (
@@ -162,30 +174,36 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
         <DialogContent className="max-w-3xl p-0 bg-black/95 flex flex-col items-center justify-center">
           <button onClick={() => setModalOpen(false)} className="absolute top-4 right-4 z-10 text-white bg-black/60 rounded-full p-2 hover:bg-black/80"><XIcon className="w-6 h-6" /></button>
           <div className="relative w-full flex items-center justify-center" style={{ minHeight: '60vh' }}>
-            <button onClick={handlePrevImage} className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-orange-400 rounded-full p-2"><ChevronLeft className="w-7 h-7 text-black" /></button>
+            {validImages.length > 1 && (
+              <button onClick={handlePrevImage} className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-orange-400 rounded-full p-2"><ChevronLeft className="w-7 h-7 text-black" /></button>
+            )}
             <div className="flex-grow flex items-center justify-center">
               <img
-                src={getSafeImageUrl(room.images[modalImageIdx])}
+                src={getSafeImageUrl(validImages[modalImageIdx] || validImages[0])}
                 alt={`${room.title} - Fullscreen ${modalImageIdx + 1}`}
                 className="object-contain max-h-[70vh] max-w-full rounded-lg shadow-2xl mx-auto"
                 style={{ background: '#222' }}
               />
             </div>
-            <button onClick={handleNextImage} className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-orange-400 rounded-full p-2"><ChevronRight className="w-7 h-7 text-black" /></button>
+            {validImages.length > 1 && (
+              <button onClick={handleNextImage} className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-orange-400 rounded-full p-2"><ChevronRight className="w-7 h-7 text-black" /></button>
+            )}
           </div>
           {/* Thumbnails */}
-          <div className="flex gap-2 py-4 overflow-x-auto w-full justify-center bg-black/60">
-            {room.images.map((img, idx) => (
-              <img
-                key={idx}
-                src={getSafeImageUrl(img)}
-                alt={`Thumb ${idx + 1}`}
-                className={`h-14 w-24 object-cover rounded cursor-pointer border-2 transition-all duration-300 ${idx === modalImageIdx ? 'border-orange-400 shadow-lg ring-2 ring-orange-400' : 'border-transparent opacity-70 hover:opacity-100'}`}
-                onClick={() => setModalImageIdx(idx)}
-                style={{ minWidth: 80 }}
-              />
-            ))}
-          </div>
+          {validImages.length > 1 && (
+            <div className="flex gap-2 py-4 overflow-x-auto w-full justify-center bg-black/60">
+              {validImages.map((img, idx) => (
+                <img
+                  key={idx}
+                  src={getSafeImageUrl(img)}
+                  alt={`Thumb ${idx + 1}`}
+                  className={`h-14 w-24 object-cover rounded cursor-pointer border-2 transition-all duration-300 ${idx === modalImageIdx ? 'border-orange-400 shadow-lg ring-2 ring-orange-400' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                  onClick={() => setModalImageIdx(idx)}
+                  style={{ minWidth: 80 }}
+                />
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

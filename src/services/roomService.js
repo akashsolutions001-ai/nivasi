@@ -44,6 +44,33 @@ function omitUndefined(obj) {
 }
 
 /**
+ * Sanitize images array before saving to Firestore:
+ * - Drops dead blob URLs and invalid placeholders
+ * - Ensures uploadedAt is an ISO string and not a serverTimestamp() Sentinel (Firestore disallows Sentinels in arrays)
+ */
+function sanitizeImagesForFirestore(images) {
+    if (!Array.isArray(images)) return [];
+    return images
+        .map((img) => {
+            if (typeof img === 'string') {
+                if (img.includes('/api/placeholder') || img.startsWith('blob:')) return null;
+                return img;
+            }
+            if (img && typeof img === 'object') {
+                if (!img.url || img.url.includes('/api/placeholder') || img.url.startsWith('blob:')) return null;
+                const uploadedAt = typeof img.uploadedAt === 'string' ? img.uploadedAt : new Date().toISOString();
+                return {
+                    ...img,
+                    uploadedAt
+                };
+            }
+            return null;
+        })
+        .filter(Boolean);
+}
+
+
+/**
  * Fetch all rooms from Firestore
  */
 export const fetchRooms = async () => {
@@ -112,6 +139,7 @@ export const addRoom = async (roomData, user, isAdmin) => {
 
         const roomToAdd = omitUndefined({
             ...roomData,
+            images: sanitizeImagesForFirestore(roomData.images),
             ...subscriptionFields,
             ownerId: isAdmin ? null : (user?.uid || null),
             ownerName: isAdmin ? null : (user?.displayName || null),
@@ -294,8 +322,13 @@ export const updateRoom = async (roomId, roomData) => {
     try {
         const roomRef = doc(db, ROOMS_COLLECTION, roomId);
 
+        const sanitizedRoomData = { ...roomData };
+        if (sanitizedRoomData.images) {
+            sanitizedRoomData.images = sanitizeImagesForFirestore(sanitizedRoomData.images);
+        }
+
         const roomToUpdate = omitUndefined({
-            ...roomData,
+            ...sanitizedRoomData,
             updatedAt: serverTimestamp()
         });
 

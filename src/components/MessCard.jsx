@@ -1,13 +1,19 @@
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import { MapPin, Phone, ExternalLink, Utensils, Clock, IndianRupee, X as XIcon, ChevronLeft, ChevronRight, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
-import { useLanguage } from '../contexts/LanguageContext.jsx';
+import { getImageUrl } from '../utils/cloudinaryUpload.js';
+
 
 const MessCard = memo(({ mess, isFirst }) => {
-  const { t } = useLanguage();
   const [modalOpen, setModalOpen] = useState(false);
+
   const [modalImageIdx, setModalImageIdx] = useState(0);
+
+  const validImages = useMemo(() => {
+    if (!Array.isArray(mess.images)) return [];
+    return mess.images.map(getImageUrl).filter(Boolean);
+  }, [mess.images]);
 
   const handleCallClick = useCallback(() => {
     window.location.href = `tel:${mess.contact}`;
@@ -24,13 +30,15 @@ const MessCard = memo(({ mess, isFirst }) => {
 
   const handlePrevImage = useCallback((e) => {
     e.stopPropagation();
-    setModalImageIdx((prev) => (prev === 0 ? mess.images.length - 1 : prev - 1));
-  }, [mess.images.length]);
+    if (validImages.length === 0) return;
+    setModalImageIdx((prev) => (prev === 0 ? validImages.length - 1 : prev - 1));
+  }, [validImages.length]);
 
   const handleNextImage = useCallback((e) => {
     e.stopPropagation();
-    setModalImageIdx((prev) => (prev === mess.images.length - 1 ? 0 : prev + 1));
-  }, [mess.images.length]);
+    if (validImages.length === 0) return;
+    setModalImageIdx((prev) => (prev === validImages.length - 1 ? 0 : prev + 1));
+  }, [validImages.length]);
 
   // Helper function to get main price for display
   const getMainPrice = () => {
@@ -53,10 +61,10 @@ const MessCard = memo(({ mess, isFirst }) => {
       {/* Image Section */}
       <div className="relative mb-4 overflow-hidden rounded-xl flex-shrink-0">
         <div className="w-full h-48 md:h-56 lg:h-64 bg-gradient-to-br from-green-100 to-green-50 flex items-center justify-center">
-          {mess.images && mess.images.length > 0 ? (
+          {validImages.length > 0 ? (
             <picture className="h-full w-full flex-shrink-0 cursor-pointer" onClick={() => handleImageClick(0)}>
               <img
-                src={mess.images[0]}
+                src={validImages[0]}
                 alt={`${mess.title} - 1`}
                 className="h-44 md:h-52 lg:h-60 w-full object-cover rounded-lg border border-green-100 hover:scale-105 transition-transform"
                 loading={isFirst ? 'eager' : 'lazy'}
@@ -88,34 +96,40 @@ const MessCard = memo(({ mess, isFirst }) => {
             <XIcon className="w-6 h-6" />
           </button>
           <div className="relative w-full flex items-center justify-center" style={{ minHeight: '60vh' }}>
-            <button onClick={handlePrevImage} className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-green-400 rounded-full p-2">
-              <ChevronLeft className="w-7 h-7 text-black" />
-            </button>
+            {validImages.length > 1 && (
+              <button onClick={handlePrevImage} className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-green-400 rounded-full p-2">
+                <ChevronLeft className="w-7 h-7 text-black" />
+              </button>
+            )}
             <picture className="flex-grow flex items-center justify-center">
               <img
-                src={mess.images[modalImageIdx]}
+                src={validImages[modalImageIdx] || validImages[0]}
                 alt={`${mess.title} - Fullscreen ${modalImageIdx + 1}`}
                 className="object-contain max-h-[70vh] max-w-full rounded-lg shadow-2xl mx-auto"
                 style={{ background: '#222' }}
               />
             </picture>
-            <button onClick={handleNextImage} className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-green-400 rounded-full p-2">
-              <ChevronRight className="w-7 h-7 text-black" />
-            </button>
+            {validImages.length > 1 && (
+              <button onClick={handleNextImage} className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-green-400 rounded-full p-2">
+                <ChevronRight className="w-7 h-7 text-black" />
+              </button>
+            )}
           </div>
           {/* Thumbnails */}
-          <div className="flex gap-2 py-4 overflow-x-auto w-full justify-center bg-black/60">
-            {mess.images.map((img, idx) => (
-              <img
-                key={idx}
-                src={img}
-                alt={`Thumb ${idx + 1}`}
-                className={`h-14 w-24 object-cover rounded cursor-pointer border-2 transition-all duration-300 ${idx === modalImageIdx ? 'border-green-400 shadow-lg ring-2 ring-green-400' : 'border-transparent opacity-70 hover:opacity-100'}`}
-                onClick={() => setModalImageIdx(idx)}
-                style={{ minWidth: 80 }}
-              />
-            ))}
-          </div>
+          {validImages.length > 1 && (
+            <div className="flex gap-2 py-4 overflow-x-auto w-full justify-center bg-black/60">
+              {validImages.map((img, idx) => (
+                <img
+                  key={idx}
+                  src={img}
+                  alt={`Thumb ${idx + 1}`}
+                  className={`h-14 w-24 object-cover rounded cursor-pointer border-2 transition-all duration-300 ${idx === modalImageIdx ? 'border-green-400 shadow-lg ring-2 ring-green-400' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                  onClick={() => setModalImageIdx(idx)}
+                  style={{ minWidth: 80 }}
+                />
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -190,10 +204,10 @@ const MessCard = memo(({ mess, isFirst }) => {
             </div>
 
             {/* Images */}
-            {mess.images && mess.images.length > 0 && (
+            {validImages.length > 0 && (
               <div className="relative">
                 <div className="flex gap-2 overflow-x-auto pb-2">
-                  {mess.images.map((img, idx) => (
+                  {validImages.map((img, idx) => (
                     <img
                       key={idx}
                       src={img}

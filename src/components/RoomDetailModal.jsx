@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Phone,
@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button.jsx';
 import { useIsMobile } from '@/hooks/use-mobile.js';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import BookingModal from './BookingModal.jsx';
+import { getImageUrl, getOptimizedImageUrl } from '../utils/cloudinaryUpload.js';
 
 const RoomDetailModal = ({ room, onClose }) => {
   const { t } = useLanguage();
@@ -31,6 +32,18 @@ const RoomDetailModal = ({ room, onClose }) => {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const isMobile = useIsMobile();
+
+  // Filter valid images to prevent errors from dead blob URLs or missing placeholders
+  const displayImages = useMemo(() => {
+    if (!Array.isArray(room?.images)) return [];
+    return room.images.filter(img => Boolean(getImageUrl(img)));
+  }, [room?.images]);
+
+  // Resolve image value (Cloudinary object or legacy URL string) to a display URL
+  const resolveImageUrl = (image, width) => {
+    if (width) return getOptimizedImageUrl(image, width);
+    return getImageUrl(image);
+  };
   
   // Carousel State
   const [isPaused, setIsPaused] = useState(false);
@@ -47,16 +60,16 @@ const RoomDetailModal = ({ room, onClose }) => {
 
   // Auto-slide effect
   useEffect(() => {
-    if (!room.images || room.images.length <= 1 || isPaused) return;
+    if (displayImages.length <= 1 || isPaused) return;
 
     const intervalId = setInterval(() => {
       setCurrentImageIndex((prev) =>
-        prev === room.images.length - 1 ? 0 : prev + 1
+        prev >= displayImages.length - 1 ? 0 : prev + 1
       );
     }, 4000);
 
     return () => clearInterval(intervalId);
-  }, [room.images, isPaused]);
+  }, [displayImages.length, isPaused]);
 
   // Resume auto-slide when fullscreen mode is closed
   useEffect(() => {
@@ -66,14 +79,16 @@ const RoomDetailModal = ({ room, onClose }) => {
   }, [isFullscreen]);
 
   const handlePrevImage = () => {
+    if (displayImages.length === 0) return;
     setCurrentImageIndex((prev) =>
-      prev === 0 ? room.images.length - 1 : prev - 1
+      prev === 0 ? displayImages.length - 1 : prev - 1
     );
   };
 
   const handleNextImage = () => {
+    if (displayImages.length === 0) return;
     setCurrentImageIndex((prev) =>
-      prev === room.images.length - 1 ? 0 : prev + 1
+      prev >= displayImages.length - 1 ? 0 : prev + 1
     );
   };
 
@@ -191,25 +206,27 @@ const RoomDetailModal = ({ room, onClose }) => {
               <div className="flex flex-col lg:flex-row gap-3 w-full">
 
                 {/* Vertical Thumbnails - Desktop Only */}
-                <div className="hidden lg:flex flex-col gap-2 w-16 overflow-y-auto max-h-[450px] custom-scrollbar flex-shrink-0">
-                  {room.images && room.images.map((img, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setCurrentImageIndex(idx)}
-                      className={`w-14 h-14 rounded-md overflow-hidden border-2 transition-all flex-shrink-0 ${idx === currentImageIndex
-                        ? 'border-orange-500 shadow-md'
-                        : 'border-gray-200 hover:border-orange-300'
-                        }`}
-                    >
-                      <img
-                        src={img}
-                        alt={`Thumbnail ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    </button>
-                  ))}
-                </div>
+                {displayImages.length > 1 && (
+                  <div className="hidden lg:flex flex-col gap-2 w-16 overflow-y-auto max-h-[450px] custom-scrollbar flex-shrink-0">
+                    {displayImages.map((img, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentImageIndex(idx)}
+                        className={`w-14 h-14 rounded-md overflow-hidden border-2 transition-all flex-shrink-0 ${idx === currentImageIndex
+                          ? 'border-orange-500 shadow-md'
+                          : 'border-gray-200 hover:border-orange-300'
+                          }`}
+                      >
+                        <img
+                          src={resolveImageUrl(img, 120)}
+                          alt={`Thumbnail ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Main Image */}
                 <div className="flex-1 flex items-center justify-center">
@@ -221,10 +238,10 @@ const RoomDetailModal = ({ room, onClose }) => {
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
                   >
-                    {room.images && room.images.length > 0 ? (
+                    {displayImages.length > 0 ? (
                       <>
                         <img
-                          src={room.images[currentImageIndex]}
+                          src={resolveImageUrl(displayImages[currentImageIndex] || displayImages[0], 900)}
                           alt={`${room.title} - Image ${currentImageIndex + 1}`}
                           className="w-full h-auto max-h-[35vh] sm:max-h-[45vh] lg:max-h-[60vh] object-contain cursor-zoom-in mx-auto block select-none"
                           onClick={() => { setIsPaused(true); setIsFullscreen(true); }}
@@ -233,7 +250,7 @@ const RoomDetailModal = ({ room, onClose }) => {
                         />
 
                         {/* Navigation Arrows */}
-                        {room.images.length > 1 && (
+                        {displayImages.length > 1 && (
                           <>
                             <button
                               onClick={handlePrevImage}
@@ -260,9 +277,9 @@ const RoomDetailModal = ({ room, onClose }) => {
                         </button>
 
                         {/* Dot Indicators */}
-                        {room.images.length > 1 && (
+                        {displayImages.length > 1 && (
                           <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-1.5 z-10 bg-black/30 px-2 py-1.5 rounded-full pointer-events-none">
-                            {room.images.map((_, idx) => (
+                            {displayImages.map((_, idx) => (
                               <div
                                 key={idx}
                                 className={`h-1.5 rounded-full transition-all ${
@@ -275,12 +292,12 @@ const RoomDetailModal = ({ room, onClose }) => {
 
                         {/* Image Counter */}
                         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full pointer-events-none">
-                          {currentImageIndex + 1} / {room.images.length}
+                          {currentImageIndex + 1} / {displayImages.length}
                         </div>
                       </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <div className="text-center">
+                      <div className="w-full h-full min-h-[220px] flex items-center justify-center bg-gray-100">
+                        <div className="text-center p-6">
                           <Home className="w-16 h-16 text-gray-300 mx-auto mb-2" />
                           <p className="text-gray-500">{t('noImageAvailable')}</p>
                         </div>
@@ -289,9 +306,9 @@ const RoomDetailModal = ({ room, onClose }) => {
                   </div>
 
                   {/* Horizontal Thumbnails - Mobile Only */}
-                  {room.images && room.images.length > 1 && (
+                  {displayImages.length > 1 && (
                     <div className="lg:hidden flex gap-2 mt-3 overflow-x-auto pb-2 scrollbar-hide">
-                      {room.images.map((img, idx) => (
+                      {displayImages.map((img, idx) => (
                         <button
                           key={idx}
                           onClick={() => setCurrentImageIndex(idx)}
@@ -301,7 +318,7 @@ const RoomDetailModal = ({ room, onClose }) => {
                             }`}
                         >
                           <img
-                            src={img}
+                            src={resolveImageUrl(img, 120)}
                             alt={`Thumb ${idx + 1}`}
                             className="w-full h-full object-cover"
                           />
@@ -507,11 +524,11 @@ const RoomDetailModal = ({ room, onClose }) => {
 
           {/* Image Counter */}
           <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 rounded-full max-w-[70vw] truncate">
-            <span className="hidden sm:inline">{room.title} • </span>{currentImageIndex + 1} / {room.images?.length || 0}
+            <span className="hidden sm:inline">{room.title} • </span>{currentImageIndex + 1} / {displayImages.length || 0}
           </div>
 
           {/* Navigation */}
-          {room.images && room.images.length > 1 && (
+          {displayImages.length > 1 && (
             <>
               <button
                 onClick={handlePrevImage}
@@ -530,22 +547,22 @@ const RoomDetailModal = ({ room, onClose }) => {
 
           {/* Main Image */}
           <img
-            src={room.images?.[currentImageIndex]}
+            src={resolveImageUrl(displayImages[currentImageIndex] || displayImages[0], 1200)}
             alt={`${room.title} - Full Size`}
             className="max-w-[95vw] sm:max-w-[90vw] max-h-[75vh] sm:max-h-[85vh] object-contain"
           />
 
           {/* Thumbnails */}
-          {room.images && room.images.length > 1 && (
+          {displayImages.length > 1 && (
             <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 sm:gap-2 bg-black/60 p-1.5 sm:p-2 rounded-lg max-w-[95vw] overflow-x-auto scrollbar-hide">
-              {room.images.map((img, idx) => (
+              {displayImages.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => setCurrentImageIndex(idx)}
                   className={`w-12 h-9 sm:w-16 sm:h-12 rounded overflow-hidden border-2 flex-shrink-0 transition-all active:scale-95 ${idx === currentImageIndex ? 'border-orange-500' : 'border-transparent opacity-60 hover:opacity-100'
                     }`}
                 >
-                  <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                  <img src={resolveImageUrl(img, 120)} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
